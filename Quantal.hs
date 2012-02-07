@@ -197,8 +197,9 @@ epspSigs sess = do
   writeFile (take 6 sess++"/sessions") $ show nms
 
 measNoise sess = runRIO $ do 
-  LoadSignals sigs <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
+  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let initialV = L.fromList [-2, 2::Double, -5, -60]
+      sigs = sigs'
   io$ print $ initialV
   io$ print $ tmax/dt
   iniampar <- sample $ initialAdaMet 100 5e-3 (posteriorNoiseV sigs) initialV
@@ -206,6 +207,7 @@ measNoise sess = runRIO $ do
   vsamples<- runAdaMetRIO 200 True froampar (posteriorNoiseV sigs)
   let [logtheta, sigma, logobs, _] = L.toList$   runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs)
+  io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
   return ()
 
 measAmps sess = runRIO $ do

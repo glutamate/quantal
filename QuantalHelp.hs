@@ -96,7 +96,10 @@ ifObs = \i-> \j-> \sig-> if (i==j) then sig else 0.000
 
 gpByInvLogPdf = \(_) -> \(_) -> \meansig-> \lndet-> \covinv-> \obssig-> let ((dt,_),obsvec) = observe obssig; meanVec = (fillV np)$(\i-> meansig (toD i)) in ((mvnPdf lndet covinv) meanVec) obsvec
 
-posteriorNoiseV sigs v = let (covM)=fillM ((np,np)) (\(i,j)-> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac i)*dt)-((realToFrac j)*dt)))))))+(if (i==j) then (exp logobs) else 0.000)) in let (inv,lndet)=invlndet covM in uniformLogPdf (0.000-50.000) (100.000) logtheta
+posteriorNoiseV sigs v = 
+  let covM=fillM (np,np) $ \(i,j)-> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac i)*dt)-((realToFrac j)*dt))))))+(if (i==j) then (exp logobs) else 0.000)) 
+      (inv,lndet)=invlndet covM 
+  in uniformLogPdf (0.000-50.000) (100.000) logtheta
  +uniformLogPdf (0.000) (10.000) sigma
  +uniformLogPdf (0.000-50.000) (100.000) logobs
  +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
@@ -273,7 +276,7 @@ whenContinues sess mma = do
       conts <- durations "continues" "foo"
       sessid <- getSessionName
       case conts of
-        [] -> if (sessid==sess) then mma else return Nothing
+        [] -> if (sess `isPrefixOf` sessid || sessid `isPrefixOf` sess) then mma else return Nothing
         (_,s):_ | s `isPrefixOf` sess -> mma
                 | otherwise -> return Nothing
   
