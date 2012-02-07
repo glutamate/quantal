@@ -74,6 +74,8 @@ unfold = \n-> \lastx-> \s-> ((unfoldN 1 n) lastx) s
 binGauss = \ns-> \p-> \q-> \cv-> \bgSd-> (binomial ns p)>>=(\nr-> normal ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd))))
 binGaussPdf = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 0 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
 
+binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
+
 binGaussLogPdf = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> log$((bigSum 0 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
 
 binGaussFrom1LogPdf ns p q  cv bgSd v = log$((bigSum 1 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
