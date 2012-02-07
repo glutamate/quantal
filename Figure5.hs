@@ -37,7 +37,7 @@ import Control.Monad.Trans
 
 main = do
   let sess = "00c9bd"
-  h <- openFile ("Figure4.tex") WriteMode 
+  h <- openFile ("Figure3.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
@@ -51,41 +51,50 @@ main = do
      "\\begin{document}",
      "\n"]
 
-  plotSamPdf "hist1" h (binGaussFull 10 0.2 0.1 0.2 0.0) (binGaussPdfFrom1 10 0.2 0.1 0.2 0.0)
+  LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps"
+  let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
+  let wfAmp = foldl1' max $ L.toList sv
+  puts $ "wfamp= "++show wfAmp++"\n"
 
 
-  plotSamPdf "hist2" h (binGaussFull 10 0.2 0.1 0.2 0.01) (binGaussPdf 10 0.2 0.1 0.2 0.01)
+
+  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
+  let tsamps = zip t0s' amps
+      t0s = map fst tsamps
+
+
+  let weighCurve' = map (weighRegression tsamps ) t0s
+      maxPcurve = foldl1 max weighCurve'
+      pcurve = map (/(maxPcurve)) weighCurve'
+  let globalSd = sqrt $ runStat (before meanF (**2)) sds
+
+  plotIt "pcurve" $ zip t0s pcurve :+: tsamps
+
+  plotIt "wf" wf
 
 
   puts "\\end{document}"
   hClose h
 
-  system $ "pdflatex Figure4.tex"
+  --system $ "pdflatex Figure3.tex"
   return ()
 
-plotSamPdf nm h sam pdf = do
-  amps <- sampleNIO 200000 $ sam
-  let lo = foldl1' min amps
-      hi = foldl1' max amps
-      dx = (hi-lo)/400
-      scale = (hi-lo)/200 -- not quite right bec histo goes less than spread o
-      xs = [lo,lo+dx..hi]
-  let plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
-                         system $ "epstopdf "++nm++".eps"
-                         hPutStrLn h $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
-  
-  plotIt nm $ Histo 100 amps :+: (zip xs $ map ((*scale) . pdf) xs)
+autoCorrSig :: Signal Double -> Signal Double
+autoCorrSig (Signal dt t0 vec) = Signal dt t0 $ L.fromList $ autoCorr $ L.toList vec
 
+--http://www.bearcave.com/misl/misl_tech/wavelets/stat/index.html
+autoCorr :: [Double] -> [Double]
+autoCorr xs = acfs where
+  n = length xs
+  mean = runStat meanF xs
+  denom = sum $ map (\xi-> (xi - mean)^2) xs
+  f xt xlag = (xt - mean) * (xlag - mean)
+  acf lag = (sum $ zipWith f xs (drop lag xs)) / denom
+  acfs = map acf [0..(n-1)]
 
-binGauss ns p q cv bgSd = do
-     nr  <- binomial ns p
-     gaussD (realToFrac nr * q) (sqrt $ q*cv*q*cv*realToFrac nr + bgSd*bgSd)
+avSigs :: [Signal Double] -> Signal Double
+avSigs sigs@((Signal dt t0 _):_) = Signal dt t0 meanVec where
+  meanVec = runStat meanF $ map (\(Signal _ _ v) -> v) sigs
 
-binGaussFull ns p q cv bgSd = do
-     nr  <- binomial ns p
-     siteAmps <- forM [0..(nr-1)] $ const $ gaussD q (q*cv)
-     gaussD (sum siteAmps) (bgSd)
-
-{-binGaussLogPdf ns p q cv bgSd v 
-   = log $ bigSum 0 ns $ \nr -> exp $ (normalLogPdf (realToFrac nr * q) (varToTau $ q*cv*q*cv*realToFrac nr + bgSd*bgSd) v) +  (binomialLogProb ns p nr) -}
-
+sigInfo (Signal dt t0 v) = (dt,t0, L.dim v)
