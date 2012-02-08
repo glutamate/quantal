@@ -67,12 +67,15 @@ main = do
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
      let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
-     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.015,0.015+tpeak) vm spikeg
-     lift $ print (sessionIdentifier, tpeak)
+     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
+     --lift $ print (sessionIdentifier, tpeak)
      --lift $ print (sessionIdentifier, length spikeg, length measDur)
      return $ Just measDur
 
-  LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps"
+  nms <- fmap read $  readFile (take 6 sess++"/sessions")
+  sigs <- fmap concat $ forM nms $ \sessNm-> do 
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+            return sigs
   let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
   let wfAmp = foldl1' max $ L.toList sv
   puts $ "wfamp= "++show wfAmp++"\n"
@@ -88,7 +91,7 @@ main = do
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
   (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
-  let tsamps = zip t0s' amps
+  let tsamps = zip t0s' $ map (*wfAmp) amps
 
 
   plotIt "pcurve" $ tsamps
@@ -96,16 +99,17 @@ main = do
   let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
   puts $ "failNew = "++show failNewT
 
-  let failOldT = filter (\(t,v) -> v<0.2 && t > 350 && t < 500) measPts 
+  let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts 
   puts $ "failOld = "++show failOldT
 
 
   puts $ show $ sigInfo $ head sigs
 
-  let Just failOldS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failOldT!!1) ) sigs
+  let Just failOldS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failOldT!!0) ) sigs
   let Just failNewS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failNewT!!0) ) sigs
 
-  plotIt "failold" $ ("trad. fail", [failOldS]) -- :+: ("new fail", [failNewS])
+  plotIt "failold" $ ("trad. fail", [failOldS]) :+: ("new fail", [failNewS])
+
 
   plotIt "wf" wf
 
@@ -113,7 +117,7 @@ main = do
   puts "\\end{document}"
   hClose h
 
-  --system $ "pdflatex Figure3.tex"
+  system $ "pdflatex Figure3.tex"
   return ()
 
 autoCorrSig :: Signal Double -> Signal Double

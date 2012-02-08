@@ -198,14 +198,31 @@ epspSigs sess = do
 
 measNoise sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let initialV = L.fromList [-2, 2::Double, -5, -60]
+  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6], replicate 10 (-60)] 
       sigs = sigs'
-  io$ print $ initialV
+  io $ print $ posteriorNoiseV sigs initialV
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 0.1} (posteriorNoiseV sigs) [] initialV
+  io $ print laout
   io$ print $ tmax/dt
-  iniampar <- sample $ initialAdaMet 100 5e-3 (posteriorNoiseV sigs) initialV
-  froampar <- runAndDiscard 500 (show . ampPar) iniampar $ adaMet False (posteriorNoiseV sigs)
-  vsamples<- runAdaMetRIO 200 True froampar (posteriorNoiseV sigs)
-  let [logtheta, sigma, logobs, _] = L.toList$   runStat meanF vsamples
+  iniampar <- if (not $ isJust mbcor) 
+                 then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
+                                 {-io$ print $ iniampar
+                                 froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
+                                                           adaMet False (posteriorNoiseV sigs)
+                                 io$ print $ froampar
+                                 runAdaMetRIO 400 False iniampar (posteriorNoiseV sigs) -}
+                 else           do {-let ampar = shrink 10 $ AMPar init2 init2 (posdefify $ fromJust mbcor) 
+                                                                 (posteriorNoiseV sigs init2) 5 2
+                                   runAdaMetRIO 400 False ampar $ posteriorNoiseV sigs -}
+                                   sample $ initialAdaMetFromCov 200 (posteriorNoiseV sigs) init2 
+                                                                    (L.scale (1/5) (posdefify $ fromJust mbcor))
+
+  io$ print $ iniampar
+  {-froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
+                                                           adaMet False (posteriorNoiseV sigs) 
+                                 io$ print $ froampar -}
+  vsamples <- runAdaMetRIO 4000 False iniampar (posteriorNoiseV sigs) 
+  let [logtheta, sigma, logobs ] = L.toList$ L.subVector 0 3 $ runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
   return ()
@@ -297,7 +314,7 @@ measNPQ sess = runRIO $ do
  
   io $ print $ posteriorNPQV amps pcurve globalSd $ maxFullV
 
-  let nsam = 1000000
+  let nsam = 100000
       nfrozen = 10000
 
 
@@ -400,10 +417,10 @@ measNPQ sess = runRIO $ do
   vsamples <- runAdaMetRIO nsam False  iniampar (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
-  let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
+{-  let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
   io $ putStrLn $ intercalate "\t" $ map (minWidth 8) $ words "n cv phi q"
   io $ putStrLn $ showNPQV $ mean
-  io $ putStrLn $ showNPQV sd 
+  io $ putStrLn $ showNPQV sd  -}
   return ()
 
   {-let nsam = 40000

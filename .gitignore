@@ -1,4 +1,9 @@
 *.hi
 *.o
 *~
+*.eps
+*.aux
+*.tex
+*.log
+*.pdf
 dist/*

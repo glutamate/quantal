@@ -36,7 +36,7 @@ assert_fac3 = (fac 3)==6
 assert_pairs0 = 2==(fst ((2,3)))
 assert_pairs1 = 3==(fst ((2,3)))
 assert_case = case 1 of 0 -> False; 1 -> True
-oneOf = \xs-> ((fmap floor)$(uniform 0.000 (realToFrac$(length xs))))>>=(\idx-> return$(ix idx xs))
+--oneOf = \xs-> ((fmap floor)$(uniform 0.000 (realToFrac$(length xs))))>>=(\idx-> return$(ix idx xs))
 uniformLogPdf = \lo-> \hi-> \x-> 
    if ((x<hi)&&(x>lo)) 
        then 1.000 
@@ -90,7 +90,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 1.000e-1
+tmax = 0.1
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -104,12 +104,12 @@ posteriorNoiseV sigs v =
   in uniformLogPdf (0.000-50.000) (100.000) logtheta
  +uniformLogPdf (0.000) (10.000) sigma
  +uniformLogPdf (0.000-50.000) (100.000) logobs
- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
- +(sum $ (flip map) (zip [1..10] sigs) $ \(i, sigv)->gpByInvLogPdf (dt) (tmax) (\y-> vmean) (lndet) (inv) sigv)
+-- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
+ +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax) (\y-> vmean) (lndet) (inv) (sigv))
   where logtheta = v@> 0
         sigma = v@> 1
         logobs = v@> 2
-        vmean = v@> 3
+        means = L.toList $ L.subVector 3 10 v
 
 (@>) = (L.@>)
 
@@ -262,11 +262,21 @@ sigmaHat = 1.6 --6.260
 obsHat = 2.7e-4
 
 
-fakesam simn ntrials = (return simn)>>=(\n-> (return 0.150)>>=(\cv-> (return sslope)>>=(\slope-> (return soffset)>>=(\offset-> (return 0.400)>>=(\phi-> (return 0.200)>>=(\plo-> (return (simq*(100/realToFrac simn)))>>=(\q-> (return 170.000)>>=(\tc-> (return simt0)>>=(\t0-> (for 1 ntrials)$(\i-> let p = phi-((phi-plo)/(1.000+(exp ((offset*slope)-(slope*(realToFrac i)))))) in ((((binGauss n p) q) cv) 0.000)>>=(\amp-> (return (0-60.000))>>=(\vstart-> ((gpByChol dt tmax) (\t-> vstart+(amp*(((((step (t-t0))*tc)*tc)*(t-t0))*(exp ((0.000-(t-t0))*tc)))))) cholm))))))))))))
+fakesam simn ntrials = return 0.150>>=(\cv-> 
+        (return 0.800)>>=(\phi-> 
+        (return 0.200)>>=(\plo-> 
+        (return (simq*(100/realToFrac simn)))>>=(\q-> 
+        (return 170.000)>>=(\tc-> 
+        (for 1 ntrials)$(\i-> 
+            let p = phi-((phi-plo)/(1.000+(exp (soffset*sslope-sslope*realToFrac i)))) 
+            in ((((binGauss simn p) q) cv) 0.000)>>=(\amp-> 
+               (return (0-60.000))>>=(\vstart-> 
+               ((gpByChol dt tmax) 
+                          (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 
+                          cholm))))))))
   where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
         soffset = ntrials / 2
         sslope = 8.000e-3 * (1000/ntrials)
-
 stagger (i, Signal dt t0 sig) = Signal dt i sig
 
 pad (c:[]) = '0':c:[]

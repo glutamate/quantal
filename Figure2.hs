@@ -36,7 +36,7 @@ import Graphics.Gnewplot.Histogram
 import Control.Monad.Trans
 
 main = do
-  let sess = "00c9bd"
+  let sess = "57246a"
   h <- openFile ("Figure2.tex") WriteMode 
   let puts = hPutStrLn h
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -55,10 +55,43 @@ main = do
 
   plotIt "nsigs" $ take 10 sigs
 
-  plotIt "autoCorr" $ map autoCorrSig $ sigs 
+  --plotIt "autoCorr" $ map autoCorrSig $ sigs 
 
-  plotIt "autoCorrAv" $ [avSigs $ map autoCorrSig $ sigs] 
+  --plotIt "autoCorrAv" $ [avSigs $ map autoCorrSig $ sigs] 
 
+  vsamples::[L.Vector Double] <- fmap (read) $ readFile (take 6 sess++"/noise_samples")
+
+  plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
+  plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
+  plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
+
+  plotIt "thetahist" $ ("theta", Histo 50 $ map (exp . (@>0)) vsamples)
+  plotIt "sigmahist" $ ("sigma", Histo 50 $ map (@>1) vsamples)
+  plotIt "obshist" $ ("obs", Histo 50 $ map  (exp . (@>2)) vsamples)
+
+  puts "posterior predicted noise signals and autocorrelation\n\n"
+
+  fakesigs<-runRIO $ do
+    vsample <- sample $ oneOf vsamples
+    let sigma = vsample@>1
+        theta = exp $ vsample@>0
+        obs = exp $ vsample @> 2
+    let cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
+    sample $ sequence $ replicate 10 $ gpByChol dt tmax (\t-> 0) cholm
+    
+  plotIt "fakesigs" $ fakesigs
+
+  fakeautocorr<-runRIO $ sample $ sequence $ replicate 10 $ do
+    vsample <- oneOf vsamples
+    let sigma = vsample@>1
+        theta = exp $ vsample@>0
+        obs = exp $ vsample @> 2
+    let cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
+    sigs <- sequence $ replicate 20 $ gpByChol dt tmax (\t-> 0) cholm
+    return $ avSigs $ map autoCorrSig $ sigs
+
+
+  plotIt "fakeautoCorr" $ ( fakeautocorr ) :+: Lines [LineWidth 5] [avSigs $ map autoCorrSig $ sigs] 
 
 
   puts "\\end{document}"

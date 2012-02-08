@@ -35,9 +35,11 @@ import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
 
+import MPFA
+
 main = do
-  let sess = "02501"
-  h <- openFile ("Figure5.tex") WriteMode 
+  let sess = "57246a"
+  h <- openFile ("Figure1.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
@@ -51,57 +53,59 @@ main = do
      "\\begin{document}",
      "\n"]
 
-  puts "Figure 5"
+  meass <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
+     rebaseRelativeTo sess
+     vm <- signalsDirect "vm"
+     sessionIdentifier <- getSessionName
+     sessionStart <- getSessionStart
+     spike <- events "spike" ()
+     running <- durations "running" ()
+     exclude <- durations "exclude" ()
+     let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
+     let noGood = contains ((>5)//swings) running
+     let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
+     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
+     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
+     let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
+     let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
+     let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
+     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
+     --lift $ print (sessionIdentifier, tpeak)
+     --lift $ print (sessionIdentifier, length spikeg, length measDur)
+     return $ Just measDur
 
-  LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps"
+  nms <- fmap read $  readFile (take 6 sess++"/sessions")
+  sigs <- fmap concat $ forM nms $ \sessNm-> do 
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+            return sigs
   let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
   let wfAmp = foldl1' max $ L.toList sv
   puts $ "wfamp= "++show wfAmp++"\n"
 
-
-
-  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
-  let tsamps = zip t0s' $ map (*wfAmp) amps
-      t0s = map fst tsamps
-
-
-  let weighCurve' = map (weighRegression tsamps ) t0s
-      maxPcurve = foldl1 max weighCurve'
-      pcurve = map (/(maxPcurve)) weighCurve'
-  let globalSd = sqrt $ runStat (before meanF (**2)) sds
-
-  plotIt "pcurve" $ zip t0s pcurve :+: tsamps
+  plotIt "sigs" $ take 10 sigs 
 
   plotIt "wf" wf
 
-  plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
 
-  vsamples::[L.Vector Double] <- fmap (thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
-  let ns = map (roundD . (@>0)) vsamples
-      ps = map (@>2) vsamples
-      qs = map ((*wfAmp) . exp . (@>3)) vsamples
-  plotIt "nplot" $ zip [(0::Double)..] $ ns
-  plotIt "pplot" $ zip [(0::Double)..] $ ps
-  plotIt "qplot" $ zip [(0::Double)..] $ qs
+  let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
 
-  plotIt "nhist" $ Histo 50 $ ns
-  plotIt "phist" $ Histo 50 $ ps
-  plotIt "qhist" $ Histo 50 $ qs
+      tfilt = filter $ \(t,v) -> t<1000
 
-  plotIt "npcor" $ zip ns ps
-  plotIt "nqcor" $ zip ns qs
-  plotIt "pqcor" $ zip qs ps
+  --print $ length $  measPts
 
+  plotIt ("epsps_"++ take 6 sess) $ measPts
+
+  plotIt "mpfa" $ mpfa 100 measPts
+
+  plotIt "mpfa500" $ mpfa 500 measPts
+
+  
 
   puts "\\end{document}"
   hClose h
 
-  system $ "pdflatex Figure5.tex"
+  system $ "pdflatex Figure1.tex"
   return ()
-
-roundD :: Double -> Double
-roundD = realToFrac . round
 
 autoCorrSig :: Signal Double -> Signal Double
 autoCorrSig (Signal dt t0 vec) = Signal dt t0 $ L.fromList $ autoCorr $ L.toList vec
