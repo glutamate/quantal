@@ -295,7 +295,7 @@ measNPQ sess = runRIO $ do
   let weighCurve' = map (weighRegression tsamps ) t0s
       maxPcurve = foldl1 max weighCurve'
       pcurve = map (/(maxPcurve)) weighCurve'
-  let globalSd = sqrt $ runStat (before meanF (**2)) sds
+  let globalSd = runStat ( meanF) sds
 
 --  let initialV = (L.fromList [100,-10,0.6,-3]:: L.Vector Double)
  
@@ -314,7 +314,7 @@ measNPQ sess = runRIO $ do
  
   io $ print $ posteriorNPQV amps pcurve globalSd $ maxFullV
 
-  let nsam = 100000
+  let nsam = 10000
       nfrozen = 10000
 
 
@@ -414,13 +414,15 @@ measNPQ sess = runRIO $ do
   --froampar <- runAndDiscard nsam (showNPQV') iniampar $ adaMet False  (posteriorNPQV amps pcurve globalSd)
   --io $ putStr "frozenpar ="
   --io $ print $ froampar
-  vsamples <- runAdaMetRIO nsam False  iniampar (posteriorNPQV amps pcurve globalSd) 
+  
+
+  vsamples <- runAdaMetRIO nsam False  (iniampar {scaleFactor = 1.4}) (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
-{-  let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
+  let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
   io $ putStrLn $ intercalate "\t" $ map (minWidth 8) $ words "n cv phi q"
   io $ putStrLn $ showNPQV $ mean
-  io $ putStrLn $ showNPQV sd  -}
+  io $ putStrLn $ showNPQV sd  
   return ()
 
   {-let nsam = 40000

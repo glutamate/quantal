@@ -10,7 +10,7 @@ import QueryPlots
 import QueryTypes
 import PlotGnuplot
 import TNUtils
-
+import Numeric.LinearAlgebra
 import qualified Math.Probably.PDF as PDF
 import Control.Monad
 import System.IO.Unsafe
@@ -117,13 +117,23 @@ dat = map (sampleN 100 . epsp) simps
 dvars = map (runStat varF) dat
 dmeans = map (runStat meanF) dat
 
-likeMPFA :: PDF.PDF (Double, [Double], Double)
-likeMPFA (n,ps,q) = 
-    let predmean = map (*(n*q)) ps
+likeMPFA :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
+likeMPFA bgSd meanvars v = 
+    let n = v@>0
+        q = v@> 1
+        fitNoiseMean = v@>2
+        fitNoiseVar = v@>3
+        ps = toList $ subVector 4 (dim v - 4) v
+        predmean = map (*(n*q)) ps
         predvar = map (\p -> n*p*(1-p)*q*q) ps
-        dist1 (x1,y1) (x2,y2) = sqrt $ (x2-x1)^^2 + (y2-y1)^^2
-        dist = sum $ map (uncurry dist1) $ zip (zip dmeans dvars) (zip predmean predvar)
-    in negate $ sum $ map (\x-> x*x) $ map (\(mu,var)-> fitfun (n,q) mu - var) $ zip dmeans dvars
+--        dist1 (x1,y1) (x2,y2) = sqrt $ (x2-x1)^^2 + (y2-y1)^^2
+--        dist = sum $ map (uncurry dist1) $ zip meanvars (zip predmean predvar)
+        
+    in sum $ flip map (zip meanvars ps) 
+           $ \((mean, var), p) -> PDF.gaussD (n*p*q) (fitNoiseMean) mean
+                                + PDF.gaussD (n*p*(1-p)*q*q) (fitNoiseVar) var
+
+--map (\x-> x*x) $ map (\(mu,var)-> fitfun (n,q) mu - var) $ meanvars
 
 fitfun (n, q) npq = npq*(1-npq/(n*q))*q 
     
@@ -151,7 +161,7 @@ maxLike like prop init = Mrkv (condSampler sf) init' id
     
 ml = head $ drop 100 $ unsafePerformIO $ runMarkovIO $ maxLike likeData proposal initvs
 ml1 = head $ drop 100 $ unsafePerformIO $ runMarkovIO $ maxLike likeData proposal simvs
-ml2 = head $ drop 50 $ unsafePerformIO $ runMarkovIO $ maxLike likeMPFA proposal initvs
+--ml2 = head $ drop 50 $ unsafePerformIO $ runMarkovIO $ maxLike likeMPFA proposal initvs
 ml3 = head $ drop 15 $ unsafePerformIO $ runMarkovIO $ maxLike (likeC) proposalC initparsC
 
 --main = putStrLn $ accushow ml4

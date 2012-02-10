@@ -35,8 +35,11 @@ import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
 
+import MPFA
+
+
 main = do
-  let sess = "02501"
+  let sess = "fg5sm1"
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -93,6 +96,15 @@ main = do
   plotIt "nqcor" $ zip ns qs
   plotIt "pqcor" $ zip qs ps
 
+  let mnvars = mpfa 100 tsamps
+
+  plotIt "mpfa" $ mnvars
+
+  let laprs@(mn1,_,_) = laplaceApprox defaultAM (likeMPFA globalSd mnvars) [] (L.fromList $ [100, 0.04, 0.1, 0.1]++map (const 0.5) mnvars)
+
+  puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
+
+  puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1)
 
   puts "\\end{document}"
   hClose h

@@ -277,6 +277,8 @@ fakesam simn ntrials = return 0.150>>=(\cv->
   where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
         soffset = ntrials / 2
         sslope = 8.000e-3 * (1000/ntrials)
+
+quantalEvent t = simq*(((((step (t-simt0))*170)*170)*(t-simt0))*(exp ((0.000-(t-simt0))*170)))
 stagger (i, Signal dt t0 sig) = Signal dt i sig
 
 pad (c:[]) = '0':c:[]
