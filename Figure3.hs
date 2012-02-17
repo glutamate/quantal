@@ -72,12 +72,8 @@ main = do
      --lift $ print (sessionIdentifier, length spikeg, length measDur)
      return $ Just measDur
 
-  nms <- fmap read $  readFile (take 6 sess++"/sessions")
-  sigs <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
-            return sigs
-  let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
-  let wfAmp = foldl1' max $ L.toList sv
+  (wf, wfAmp, sigs) <- getWf sess
+
   puts $ "wfamp= "++show wfAmp++"\n"
 
 

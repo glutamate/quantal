@@ -21,6 +21,9 @@ import "baysig" Baysig.Estimate.RTS
 import "probably" Math.Probably.RandIO
 import "probably" Math.Probably.NelderMead
 import Data.List
+import System.Environment
+
+import Data.Binary
 
 import Query hiding (io) 
 import QueryTypes
@@ -90,7 +93,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 0.1
+tmax = 0.10
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -99,17 +102,22 @@ ifObs = \i-> \j-> \sig-> if (i==j) then sig else 0.000
 gpByInvLogPdf = \(_) -> \(_) -> \meansig-> \lndet-> \covinv-> \obssig-> let ((dt,_),obsvec) = observe obssig; meanVec = (fillV np)$(\i-> meansig (toD i)) in ((mvnPdf lndet covinv) meanVec) obsvec
 
 posteriorNoiseV sigs v = 
-  let covM=fillM (np,np) $ \(i,j)-> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac i)*dt)-((realToFrac j)*dt))))))+(if (i==j) then (exp logobs) else 0.000)) 
+  let covM=fillM (np',np') $ \(i,j)-> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac i)*dt)-((realToFrac j)*dt))))))+(if (i==j) then (exp logobs) else 0.000)) 
       (inv,lndet)=invlndet covM 
   in uniformLogPdf (0.000-50.000) (100.000) logtheta
  +uniformLogPdf (0.000) (10.000) sigma
  +uniformLogPdf (0.000-50.000) (100.000) logobs
 -- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
- +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax) (\y-> vmean) (lndet) (inv) (sigv))
+ +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
   where logtheta = v@> 0
         sigma = v@> 1
         logobs = v@> 2
+        Signal _ _ sigv1 : _ = sigs
+        np' =  L.dim sigv1
+        tmax' = realToFrac np' * dt 
         means = L.toList $ L.subVector 3 10 v
+
+unSig (Signal _ _ sigv1) = sigv1
 
 (@>) = (L.@>)
 
@@ -120,12 +128,29 @@ ouSynapseLogPdf (covinv, lndet)
 
 scaleSig off x (Signal dt t0 vec) = Signal dt t0 (L.mapVector (\v-> v*x+off) vec)
 
+sigNpts (Signal _ _ v)= L.dim v
+
+zeroSigInit :: Double -> Signal Double -> Signal Double
+zeroSigInit tbase (Signal dt tst vec) = 
+   let nzero = round $ tbase/dt
+       basevec = L.subVector (nzero) (L.dim vec - nzero) vec
+       zerovec = L.fromList $ replicate nzero 0
+   in Signal dt tst (L.join [zerovec, basevec])
+
 baselineSig :: Double -> Signal Double -> Signal Double
 baselineSig tbase (Signal dt tst vec) = 
    let ntake = round $ tbase/dt
        basevec = L.subVector 0 ntake vec
        xsub = (L.foldVector (+) 0 basevec) / realToFrac ntake      
    in (Signal dt tst (L.mapVector (subtract xsub) vec))
+
+baselineSigFrom :: Double -> Double -> Signal Double -> Signal Double
+baselineSigFrom tfrom tbase (Signal dt tst vec) = 
+   let ntake = round $ (tbase-tfrom)/dt
+       basevec = L.subVector (round $ tfrom/dt) ntake vec
+       xsub = (L.foldVector (+) 0 basevec) / realToFrac ntake      
+   in (Signal dt tst (L.mapVector (subtract xsub) vec))
+
 
 posteriorSigV wf invDetails sig v 
   = ouSynapseLogPdf invDetails (scaleSig (v0) amp wf) sig
@@ -156,12 +181,14 @@ fastNPQ pdfN n0 par0 = fN initLike (n0-1) par0 where
                                  then fN thislike (nlast+1) thispars
                                  else (pars, nlast, lastLike, simp)
   optimise n pars = let pdf = pdfN n
-                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 0.1} pdf [] pars
+                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 0.1} pdf [] [] pars
                         --(maxPost,hess) = hessianFromSimplex (negate . pdfN) [] $ augmentSimplex n smplx 
                         like = pdf maxV
                       in  trace ("laplace"++show n++": "++show maxV++" lh="++show like) $ (like, maxV, smplx)
 
        
+posDefCov ampar = ampar { ampCov = posdefify $ ampCov ampar}
+
 augmentSimplex n = map f where
    f (vec, like) = (L.join [morev, vec], like)
    morev = L.fromList [realToFrac n]
@@ -211,12 +238,14 @@ atLeastOne' x | isNaN x || isInfinite x = 1.0
 
 
 
-traceit s x = trace (s++": "++show x) x
+--traceit s x = trace (s++": "++show x) x
 
 setN x v = L.buildVector 6 $ \ix -> if ix == 0 then x else v L.@> ix
 
 cut = 500
 
+sigSlope :: Signal Double -> Double
+sigSlope (Signal dt _ sv) = fst $ runStat regressF $ zip [0,dt..] $ L.toList sv
 
 weigh _ [] = []
 weigh t_hat (pt@(t_data,y):rest) 
@@ -298,6 +327,9 @@ startNs = [("00c9", 50), ("84", 40), ("512", 50) ]
 filters = [("b34", \(t,amp)-> t>5300)]
 
 
+getBurnIn sess = case find (\(s,v) -> s `isPrefixOf` sess) burnIn of
+                  Just (s,v) -> v
+                  Nothing -> 0
 
 getStartN sess = case find (\(s,v) -> s `isPrefixOf` sess) startNs of
                   Just (s,v) -> v
@@ -323,6 +355,46 @@ posteriorTop pcurve amparloops v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loop
         q = exp $ v @> 3
         --relfracs = map ( (@>0) .  ampPar) amparloops
         amps =map ( (@>0) .  ampPar) amparloops
+
+
+getSess def = do
+  args <- getArgs 
+  case args of 
+    [] -> return def
+    s : _ -> return s
+
+datasess = 
+-- words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
+ words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 b62b8f cf96ab fcb952 "
+
+burnIn = [("22b", 8000), ("b62", 6000), ("cf96", 4000), ("b34", 3000)]
+
+slopeFilter = [("0ca", 4)]
+
+nsol = 4
+
+getWf sess = do
+  nms <- fmap read $  readFile (take 6 sess++"/sessions")
+  sigs' <- fmap concat $ forM nms $ \sessNm-> do 
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+            return sigs
+  let sigs = case lookup (take 3 sess) slopeFilter of
+                Nothing -> sigs'
+                Just x -> filter ((<x) . abs . sigSlope) sigs'
+  let wf@(Signal _ _ sv) = zeroSigInit 0.03 $ baselineSigFrom 0.02 0.032 $ averageSigs $ sigs
+  return $ (wf, foldl1' max $ L.toList sv, sigs')
+
+getWf' sess = do
+  nms <- fmap read $  readFile ("sessions")
+  sigs' <- fmap concat $ forM nms $ \sessNm-> do 
+            LoadSignals sigs <- decodeFile $ "sigs_"++take 6 sessNm++"_epsps" 
+            return sigs
+  let sigs = case lookup (take 3 sess) slopeFilter of
+                Nothing -> sigs'
+                Just x -> filter ((<x) . abs . sigSlope) sigs'
+  let wf@(Signal _ _ sv) = zeroSigInit 0.03 $ baselineSigFrom 0.02  0.032 $ averageSigs $ sigs
+  return $ (wf, foldl1' max $ L.toList sv, sigs')
+
 
 
 
@@ -358,7 +430,6 @@ posteriorLoop' sd amtop pcurveVal sigAmpMean v
        p = pcurveVal * phi
        
 updateG wf invDetails pcurve sigs (ampartop,amparloops) = do
-   --DONT FORGET NOT TO CACHE PREVIOUS POSTERIOR VALUE
    newtop <- adaMetNoCacheP False (posteriorTop pcurve amparloops) ampartop
    newloops <- forM (zip3 pcurve sigs amparloops) $ \(pcurveVal, sig, ampar) ->
                  adaMetNoCacheP False 
@@ -367,7 +438,6 @@ updateG wf invDetails pcurve sigs (ampartop,amparloops) = do
    return (newtop, newloops)
 
 updateG' sd amps pcurve topcool (amtop, amparloops) = do
-   --DONT FORGET NOT TO CACHE PREVIOUS POSTERIOR VALUE
    newtop <- adaMetNoCacheP False ((/topcool) . posteriorTop pcurve amparloops) amtop
    --newtopQCV <- adaMetNoCacheP False ((/topcool) . posteriorTopQCV pcurve newtopNP amparloops) amtopQCV
    newloops <- forM (zip3 pcurve amps amparloops) $ \(pcurveVal, amp, ampar) ->

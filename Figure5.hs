@@ -39,7 +39,8 @@ import MPFA
 
 
 main = do
-  let sess = "fg5sm1"
+  sess <- getSess "fg5sm1"
+----let sess = "fg5sm1"
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -54,18 +55,15 @@ main = do
      "\\begin{document}",
      "\n"]
 
-  puts "Figure 5"
+  puts $ "Figure 5: session "++sess
 
-  LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps"
-  let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
-  let wfAmp = foldl1' max $ L.toList sv
-  puts $ "wfamp= "++show wfAmp++"\n"
+  (wf, wfAmp, sigs) <- getWf sess
 
-
+  print wfAmp
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
-  let tsamps = zip t0s' $ map (*wfAmp) amps
+  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
+  let tsamps = filter (getFilter sess) $ zip t0s' $ map (*wfAmp) amps'
       t0s = map fst tsamps
 
 
@@ -80,7 +78,12 @@ main = do
 
   plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
 
-  vsamples::[L.Vector Double] <- fmap (thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
+  vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
+
+  print $ head vsamples
+  print $ last vsamples
+
+
   let ns = map (roundD . (@>0)) vsamples
       ps = map (@>2) vsamples
       qs = map ((*wfAmp) . exp . (@>3)) vsamples
@@ -96,15 +99,15 @@ main = do
   plotIt "nqcor" $ zip ns qs
   plotIt "pqcor" $ zip qs ps
 
-  let mnvars = mpfa 100 tsamps
+  {-let mnvars = mpfa 100 tsamps
 
   plotIt "mpfa" $ mnvars
 
-  let laprs@(mn1,_,_) = laplaceApprox defaultAM (likeMPFA globalSd mnvars) [] (L.fromList $ [100, 0.04, 0.1, 0.1]++map (const 0.5) mnvars)
+  let laprs@(mn1,_,_) = laplaceApprox defaultAM (likeMPFA globalSd mnvars) [] [] (L.fromList $ [100, 0.04, 0.1, 0.1]++map (const 0.5) mnvars)
 
   puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
 
-  puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1)
+  puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
   puts "\\end{document}"
   hClose h

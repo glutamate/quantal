@@ -80,6 +80,7 @@ simulate sess rest = runRIO $ do
   sigs <- fmap ( map stagger . zip [1..] ) $ sample $ fakesam n ntrials
   io $ encodeFile (take 6 sess++"/sigs_"++take 6 sess++"_epsps") $ LoadSignals sigs 
   io $ writeFile (take 6 sess++"/noisePars") $ show (log thetaHat, sigmaHat, log obsHat)
+  io $ writeFile (take 6 sess++"/sessions") $ show [sess]
  
 
 summary sess = do
@@ -88,8 +89,8 @@ summary sess = do
   let puts = hPutStrLn h
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
-                         puts $"\\includegraphics[width=16cm]{"++nm++"}"
-  meass <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
+                         puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
+  measss <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
      rebaseRelativeTo sess
      vm <- signalsDirect "vm"
      sessionIdentifier <- getSessionName
@@ -98,15 +99,15 @@ summary sess = do
      running <- durations "running" ()
      exclude <- durations "exclude" ()
      let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
-     let noGood = contains ((>5)//swings) running
+     let noGood = contains ((>3)//swings) running
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
      let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
      let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
      let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
-     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.015,0.015+tpeak) vm spikeg
-     return $ Just measDur
+     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
+     return $ Just (measDur, swings)
   puts $ unlines     ["\\documentclass[11pt]{article}",
      "%include lhs2TeX.fmt",
      "%include polycode.fmt",
@@ -115,18 +116,30 @@ summary sess = do
      "\\begin{document}",
      sess,
      "\n\ntraditionally measured EPSP amplitudes\n\n"]
+ 
+  let meass = map fst measss
 
-  plotIt ("epsps_"++ take 6 sess) $ Points [PointSize 1] $ concat meass
+  plotIt ("epsps_"++ take 6 sess) $ ((durStart $ concat meass) :: [(Double,Double)])
 
-  nms <- fmap read $ readFile ("sessions")
-  sigs <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <-  decodeFile $ "sigs_"++take 6 sessNm++"_epsps" 
-            return sigs
+  plotIt ("swings_"++ take 6 sess) $  concat $ map snd measss
 
-  let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
-  let wfAmp = foldl1' max $ L.toList sv
+  
+
+  plotIt ("swinghists_"++ take 6 sess) $ Histo 400 $ filter (<3) $ map snd $ concat $ map snd measss
+
+
+  (wf, wfAmp, sigs) <- getWf' sess
+
+  putStrLn $ "nwfpts="++show (sigNpts wf)
+
   puts $ "wfamp= "++show wfAmp++"\n"
   plotIt "wf" wf
+  print wfAmp
+
+
+  plotIt "slopeHisto" $ Histo 100 $ map sigSlope sigs 
+
+
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
   (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile ("epsps")
   plotIt ("epspsou_"++ take 6 sess) $ Points [PointSize 1] $ zip t0s' $ map (*wfAmp) amps
@@ -134,6 +147,9 @@ summary sess = do
   puts $ "wfamp= "++show wfAmp++"\n"
   puts $ "\nnsigs= "++show (length sigs)++"\n"
   plotIt "wf" $ wf 
+
+  plotIt "wfs" $ take 10 sigs ++ (take 10 $ reverse sigs)
+
   --plotIt "first10" $ take 3 sigs 
 
 
@@ -182,10 +198,11 @@ epspSigs sess = do
      running <- durations "running" ()
      exclude <- durations "exclude" ()
      let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
-     let noGood = contains ((>5)//swings) running
+     let noGood = contains ((>3)//swings) running 
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
-     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
+     let noiseSigs = take 50 $ limitSigs' (-0.06) (-0.01) $ around (spikeg) $ vm
      let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
+     --let slopes = sigStat (fmap fst regressF) epspSigs
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
      let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
@@ -199,10 +216,11 @@ epspSigs sess = do
 measNoise sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6], replicate 10 (-60)] 
-      sigs = sigs'
+      sigs = take 10 sigs'
   io $ print $ posteriorNoiseV sigs initialV
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 0.1} (posteriorNoiseV sigs) [] initialV
-  io $ print laout
+  let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5} (posteriorNoiseV sigs) [] fixed initialV
+  --io $ print laout
   io$ print $ tmax/dt
   iniampar <- if (not $ isJust mbcor) 
                  then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
@@ -215,13 +233,13 @@ measNoise sess = runRIO $ do
                                                                  (posteriorNoiseV sigs init2) 5 2
                                    runAdaMetRIO 400 False ampar $ posteriorNoiseV sigs -}
                                    sample $ initialAdaMetFromCov 200 (posteriorNoiseV sigs) init2 
-                                                                    (L.scale (1/5) (posdefify $ fromJust mbcor))
+                                                                    (L.scale (1/5) (posdefify $ fromJust mbcor)) 
 
   io$ print $ iniampar
   {-froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
                                                            adaMet False (posteriorNoiseV sigs) 
-                                 io$ print $ froampar -}
-  vsamples <- runAdaMetRIO 4000 False iniampar (posteriorNoiseV sigs) 
+  io$ print $ froampar -}
+  vsamples <- runAdaMetRIO 4000 False (posDefCov $ iniampar {scaleFactor = 1.5}) (posteriorNoiseV sigs) 
   let [logtheta, sigma, logobs ] = L.toList$ L.subVector 0 3 $ runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
@@ -232,15 +250,16 @@ measAmps sess = runRIO $ do
   let covM = fillM (np,np) $
               \(i,j)-> ((covOU (exp logtheta) (sigma::Double)) (toD i)) (toD j)+ifObs i j (exp logobs)
   let invDetails = invlndet covM
-  nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
+  {-nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
   sigs <- fmap concat $ forM nms $ \sessNm-> do 
             LoadSignals sigs <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
             return sigs
-  let wf = baselineSig 0.003 $ averageSigs $ sigs
+  let wf = baselineSig 0.003 $ averageSigs $ sigs -}
+  (wf, _, sigs) <- io $ getWf sess
   h<- io $ openFile (take 6 sess++"/epsps") WriteMode 
   forM_ sigs $ \sig@(Signal dt t0 _) -> do
       let initialV = L.fromList [-60,1]
-      case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV wf invDetails sig) [] initialV of
+      case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV wf invDetails sig) [] [] initialV of
 
          (v, Just cor, smplx) -> do
                 let amp = v @> 1
@@ -250,7 +269,7 @@ measAmps sess = runRIO $ do
                 io $ hPutStrLn h $ show (t0, amp,sd)
 
          _             -> do
-                vsamples <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] initialV
+                vsamples <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] [] initialV
                 let (amp,sd) = both meanF stdDevF `runStat` map (@>1) vsamples
                 io $ print (t0,amp,sd)
                 io $ hPutStrLn h $ show (t0, amp,sd)
@@ -264,11 +283,9 @@ measAmps1 sess = runRIO $ do
   let covM = fillM (np,np) $
               \(i,j)-> ((covOU (exp logtheta) (sigma::Double)) (toD i)) (toD j)+ifObs i j (exp logobs)
   let invDetails = invlndet covM
-  nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
-  sigs <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
-            return sigs
-  let wf = baselineSig 0.003 $ averageSigs $ sigs
+
+  (wf, wfAmp, sigs) <- io $ getWf sess
+
   let sig@(Signal dt t0 _) = head sigs
   let initialV = L.fromList [-60,1]
 {-  iniampar <- sample $ initialAdaMet 100 5e-3 (posteriorSigV wf invDetails sig) initialV
@@ -276,7 +293,7 @@ measAmps1 sess = runRIO $ do
   vsamples<- runAdaMetRIO 3000 True froampar (posteriorSigV wf invDetails sig)
   let (amp,sd) = both meanF stdDevF `runStat` map (@>1) vsamples-}
 --  io $ print (amp,sd)
-  nmasams <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] initialV
+  nmasams <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] [] initialV
   let (ampnm,sdnm) = both meanF stdDevF `runStat` map (@>1) nmasams
 --  io $ print (amp,sd)
   io $ print (ampnm,sdnm)
@@ -314,8 +331,8 @@ measNPQ sess = runRIO $ do
  
   io $ print $ posteriorNPQV amps pcurve globalSd $ maxFullV
 
-  let nsam = 10000
-      nfrozen = 10000
+  let nsam = 150000
+      nfrozen = 200000
 
 
   iniampar <- sample $ initialAdaMet 500 5e-3 (posteriorNPQV amps pcurve globalSd) maxFullV
@@ -411,12 +428,12 @@ measNPQ sess = runRIO $ do
 --  iniampar <- sample $ initialAdaMetWithCov 500 (posteriorNPQV amps pcurve globalSd) cor maxFullV
 --  io $ putStr "inipar ="
 --  io $ print $ iniampar 
-  --froampar <- runAndDiscard nsam (showNPQV') iniampar $ adaMet False  (posteriorNPQV amps pcurve globalSd)
-  --io $ putStr "frozenpar ="
-  --io $ print $ froampar
+  froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.1}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
+  io $ putStr "frozenpar ="
+  io $ print $ froampar
   
 
-  vsamples <- runAdaMetRIO nsam False  (iniampar {scaleFactor = 1.4}) (posteriorNPQV amps pcurve globalSd) 
+  vsamples <- runAdaMetRIO nsam True froampar (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 

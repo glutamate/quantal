@@ -75,8 +75,6 @@ simsum = writeTex "simSummary.tex" $ forM_ [1000, 2500] $ \ntr -> do
                    (return [])
    plotIt ("sim_npq_res"++ntrs) pts
 
-datasess = 
- words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
 
 whenM mb mu = do 
    b <- mb
