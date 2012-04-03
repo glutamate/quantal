@@ -35,6 +35,10 @@ import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
 
+plot3v x y z = Vplots [GnuplotBox x, GnuplotBox y, GnuplotBox z]
+plot3h x y z = Hplots [GnuplotBox x, GnuplotBox y, GnuplotBox z]
+
+
 main = do
   let sess = "57246a"
   h <- openFile ("Figure2.tex") WriteMode 
@@ -53,7 +57,7 @@ main = do
 
   LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
 
-  plotIt "nsigs" $ take 10 sigs
+  let realNoise =  take 10 sigs
 
   --plotIt "autoCorr" $ map autoCorrSig $ sigs 
 
@@ -61,25 +65,57 @@ main = do
 
   vsamples::[L.Vector Double] <- fmap (read) $ readFile (take 6 sess++"/noise_samples")
 
-  plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
-  plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
-  plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
+  --plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
+  --plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
+  --plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
 
-  plotIt "thetahist" $ ("theta", Histo 50 $ map (exp . (@>0)) vsamples)
-  plotIt "sigmahist" $ ("sigma", Histo 50 $ map (@>1) vsamples)
-  plotIt "obshist" $ ("obs", Histo 50 $ map  (exp . (@>2)) vsamples)
+  let thetahist =   Histo 50 $ map (exp . (@>0)) vsamples
+  let sigmahist =   Histo 50 $ map (@>1) vsamples
+  let obshist = Histo 50 $ map  (exp . (@>2)) vsamples
 
   puts "posterior predicted noise signals and autocorrelation\n\n"
+
+  hists <- forM datasess $ \sess -> do
+      (wf, wfAmp, _) <- getWf sess
+      vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/noise_samples")
+      let ts =  HistoStyle "histeps" 50 $ map (exp . (@>0)) vsamples
+          ss =  HistoStyle "histeps" 50 $ map (@>1) vsamples
+          os =  HistoStyle "histeps" 50 $ map (exp . (@>2)) vsamples
+      print sess
+      print wfAmp
+      print (showHisto ts, showHisto ss, showHisto os)
+      return $ (sess, [ts,ss,os])
+
+  let getN' n  = map $ \(sess, vals) -> vals!!n
+  
+  let plotIx ix lo hi =     (  ManySup $ take nsol $ getN' ix hists) 
+                         :==: (   ManySup $ drop nsol $ getN' ix hists)
+
+  let lowplot = plot3h (plotIx 0 0 1) (plotIx 1 0 1) (plotIx 2 0 1)
 
   fakesigs<-runRIO $ do
     vsample <- sample $ oneOf vsamples
     let sigma = vsample@>1
         theta = exp $ vsample@>0
         obs = exp $ vsample @> 2
-    let cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
+        covM = fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
+    let cholm = chol $ covM
     sample $ sequence $ replicate 10 $ gpByChol dt tmax (\t-> 0) cholm
     
-  plotIt "fakesigs" $ fakesigs
+--  plotIt "fakesigs" $ fakesigs 
+
+  let fakeNoise3 = fakesigs
+  let fakeNoise2 = Noplot
+
+{-  covM <-runRIO $ do
+    vsample <- sample $ oneOf vsamples
+    let sigma = vsample@>1
+        theta = exp $ vsample@>0
+        obs = exp $ vsample @> 2
+        covM = fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
+    return covM
+
+  print $ L.takeDiag covM -}
 
   fakeautocorr<-runRIO $ sample $ sequence $ replicate 10 $ do
     vsample <- oneOf vsamples
@@ -91,7 +127,10 @@ main = do
     return $ avSigs $ map autoCorrSig $ sigs
 
 
-  plotIt "fakeautoCorr" $ ( fakeautocorr ) :+: Lines [LineWidth 5] [avSigs $ map autoCorrSig $ sigs] 
+  let autoCorr3 = ( Lines [LineWidth 1, LineType 1, LineColor "red"]fakeautocorr ) :+: Lines [LineWidth 5, LineType 1, LineColor "black"] [avSigs $ map autoCorrSig $ sigs] 
+ 
+
+  plotIt "fig2" $ ((realNoise :==: fakeNoise3) :||: autoCorr3) :==: lowplot
 
 
   puts "\\end{document}"
@@ -116,3 +155,6 @@ autoCorr xs = acfs where
 avSigs :: [Signal Double] -> Signal Double
 avSigs sigs@((Signal dt t0 _):_) = Signal dt t0 meanVec where
   meanVec = runStat meanF $ map (\(Signal _ _ v) -> v) sigs
+
+showHisto (Histo n dbls) = show (n, dbls)
+showHisto (HistoStyle sty n dbls) = show (n, sty, dbls)

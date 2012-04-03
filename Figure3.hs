@@ -36,7 +36,7 @@ import Graphics.Gnewplot.Histogram
 import Control.Monad.Trans
 
 main = do
-  let sess = "00c9bd"
+  let sess = "57246a"
   h <- openFile ("Figure3.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -69,7 +69,7 @@ main = do
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
      let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
      --lift $ print (sessionIdentifier, tpeak)
-     --lift $ print (sessionIdentifier, length spikeg, length measDur)
+     lift $ print (sessionIdentifier, length spikeg, length measDur)
      return $ Just measDur
 
   (wf, wfAmp, sigs) <- getWf sess
@@ -83,38 +83,88 @@ main = do
 
   --print $ length $  measPts
 
-  plotIt ("epsps_"++ take 6 sess) $ measPts
+  --plotIt ("epsps_"++ take 6 sess) $ measPts
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
   (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
   let tsamps = zip t0s' $ map (*wfAmp) amps
 
+  let rngIt x = Points [PointType 7] $ XRange 10 5800 $ YRange (-0.6) 1.6 x
 
-  plotIt "pcurve" $ tsamps
+  plotIt "pcurve" $ (YLabel "EPSP amplitude (mV)" $ rngIt measPts) :||: (YTics [] $ rngIt tsamps)
  
   let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
-  puts $ "failNew = "++show failNewT
+  --puts $ "failNew = "++show failNewT
 
   let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts 
-  puts $ "failOld = "++show failOldT
+  --puts $ "failOld = "++show failOldT
 
 
-  puts $ show $ sigInfo $ head sigs
+  --puts $ show $ sigInfo $ head sigs
 
-  let Just failOldS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failOldT!!0) ) sigs
-  let Just failNewS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failNewT!!0) ) sigs
+--  let Just failOldS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failOldT!!0) ) sigs
+--  let Just failNewS = find (\(Signal dt t0 _)-> t0+100*dt > (fst $ failNewT!!0) ) sigs
 
-  plotIt "failold" $ ("trad. fail", [failOldS]) :+: ("new fail", [failNewS])
+--  plotIt "failold" $ ("trad. fail", [failOldS]) :+: ("new fail", [failNewS])
 
 
-  plotIt "wf" wf
+  
+  --plotIt "wf" wf
+  --plotIt "tst" GnuplotTest
 
+--  let var1 = runStat meanF $ map (localVar measPts) measPts
+--  let var2 = runStat meanF $ map (localVar tsamps) tsamps
+
+--  puts $ show (var1, var2)
+
+  var12 <- forM datasess $ \sess1 -> do
+     (var1, var2) <- varDiff sess1
+     puts $ take 6 sess1++ "\t"++show var1++ "\t"++show var2
+     return (var1, var2)
+
+  puts $ show $ map fst var12
+  puts $ show $ map snd var12
 
   puts "\\end{document}"
   hClose h
 
   system $ "pdflatex Figure3.tex"
   return ()
+
+varDiff sess = do
+  meass <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
+     rebaseRelativeTo sess
+     vm <- signalsDirect "vm"
+     sessionIdentifier <- getSessionName
+     sessionStart <- getSessionStart
+     spike <- events "spike" ()
+     running <- durations "running" ()
+     exclude <- durations "exclude" ()
+     let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
+     let noGood = contains ((>5)//swings) running
+     let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
+     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
+     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
+     let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
+     let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
+     let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
+     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
+     --lift $ print (sessionIdentifier, tpeak)
+     lift $ print (sessionIdentifier, length spikeg, length measDur)
+     return $ Just measDur
+
+  (wf, wfAmp, sigs) <- getWf sess
+
+  let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
+  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
+  let tsamps = zip t0s' $ map (*wfAmp) amps
+  let var1 = runStat meanF $ map (localVar measPts) measPts
+  let var2 = runStat meanF $ map (localVar tsamps) tsamps
+
+  return (var1, var2)
+
+
 
 autoCorrSig :: Signal Double -> Signal Double
 autoCorrSig (Signal dt t0 vec) = Signal dt t0 $ L.fromList $ autoCorr $ L.toList vec

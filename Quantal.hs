@@ -53,7 +53,7 @@ main = do
   when ('4' `elem` dowhat) $ measNPQ sess
   when ('5' `elem` dowhat) $ summary sess
 
-  when ('7' `elem` dowhat) $ measAmps1 sess
+--  when ('7' `elem` dowhat) $ measAmps1 sess
 
   when ('8' `elem` dowhat) $ simulateAll [25, 50, 300] [1000,2500]
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
@@ -148,7 +148,7 @@ summary sess = do
   puts $ "\nnsigs= "++show (length sigs)++"\n"
   plotIt "wf" $ wf 
 
-  plotIt "wfs" $ take 10 sigs ++ (take 10 $ reverse sigs)
+  plotIt "wfs" $ take 10 sigs -- ++ (take 10 $ reverse sigs)
 
   --plotIt "first10" $ take 3 sigs 
 
@@ -220,8 +220,10 @@ measNoise sess = runRIO $ do
   io $ print $ posteriorNoiseV sigs initialV
   let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
   let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5} (posteriorNoiseV sigs) [] fixed initialV
-  --io $ print laout
+  io $ print laout
   io$ print $ tmax/dt
+  let sigpts = snd $ observe $ head sigs
+  io $ print $ L.dim sigpts
   iniampar <- if (not $ isJust mbcor) 
                  then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
                                  {-io$ print $ iniampar
@@ -278,7 +280,7 @@ measAmps sess = runRIO $ do
   io $ hClose h
   return ()
 
-measAmps1 sess = runRIO $ do
+{-measAmps1 sess = runRIO $ do
   (logtheta, sigma, logobs) <- fmap read $ io $ readFile (take 6 sess++"/noisePars")
   let covM = fillM (np,np) $
               \(i,j)-> ((covOU (exp logtheta) (sigma::Double)) (toD i)) (toD j)+ifObs i j (exp logobs)
@@ -296,7 +298,7 @@ measAmps1 sess = runRIO $ do
   nmasams <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] [] initialV
   let (ampnm,sdnm) = both meanF stdDevF `runStat` map (@>1) nmasams
 --  io $ print (amp,sd)
-  io $ print (ampnm,sdnm)
+  io $ print (ampnm,sdnm) -}
 
 
   --plotPts $ zip [0..] $ map (@>1) vsamples

@@ -78,26 +78,30 @@ main = do
   sigs <- fmap concat $ forM nms $ \sessNm-> do 
             LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
             return sigs
-  let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
+  let wf@(Signal _ _ sv) =  averageSigs $ sigs
   let wfAmp = foldl1' max $ L.toList sv
-  puts $ "wfamp= "++show wfAmp++"\n"
+  puts $ "Figure 1\n\n"
 
-  plotIt "sigs" $ take 10 sigs 
+  let plotA = AxisLabels "time (s)" "membrane voltage (mV)" $ (Lines [LineWidth 1, LineType 1, LineColor "red"] $ take 10 $ drop 250 sigs) :+: (Lines [LineWidth 4, LineType 1, LineColor "black"] $ smap (\v -> v-2.5) wf)
 
-  plotIt "wf" wf
+
+--  plotIt "wf" wf
 
 
   let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
 
       tfilt = filter $ \(t,v) -> t<1000
 
-  --print $ length $  measPts
 
-  plotIt ("epsps_"++ take 6 sess) $ measPts
+  let plotB = AxisLabels "time (s)" "EPSP (mV)" $ XRange 0 10000 measPts
 
-  plotIt "mpfa" $ mpfa 100 measPts
+  let plotC = AxisLabels "mean (mV)" "variance (mV^2)" $ mpfa 100 measPts
 
-  plotIt "mpfa500" $ mpfa 500 measPts
+  let plotD = AxisLabels "mean (mV)" "variance (mV^2)" $mpfa 500 measPts
+
+  plotIt "sigs" $ (A plotA :||: B plotB) :==: (C plotC :||: D plotD)
+
+--  plotIt ("epsps_"++ take 6 sess) $ measPts
 
   
 

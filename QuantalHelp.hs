@@ -93,7 +93,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 0.10
+tmax = 0.05
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -266,6 +266,14 @@ zscore tsamps (t,amp) = abs z where
   detrended = map (\(t,amp)-> amp - (slope*t + offset)) relevant
   (mean, sd) = runStat meanSDF $ detrended
   z = (amp - (slope*t + offset))/ sd
+
+localVar :: [(Double,Double)] -> (Double,Double) -> Double
+localVar tsamps (t,amp) = sd*sd where
+  relevant = filter ((< 200) . abs . (`subtract` t) . fst) tsamps
+  (slope, offset) = runStat regressF $ relevant
+  detrended = map (\(t,amp)-> amp - (slope*t + offset)) relevant
+  (mean, sd) = runStat meanSDF $ detrended
+  z = (amp - (slope*t + offset))/ sd
  
 
 showNPQV' am = showNPQV (ampPar am)++" lh: "++show (lastLike am)
@@ -323,8 +331,6 @@ whenContinues sess mma = do
         (_,s):_ | s `isPrefixOf` sess -> mma
                 | otherwise -> return Nothing
   
-startNs = [("00c9", 50), ("84", 40), ("512", 50) ]
-filters = [("b34", \(t,amp)-> t>5300)]
 
 
 getBurnIn sess = case find (\(s,v) -> s `isPrefixOf` sess) burnIn of
@@ -364,12 +370,19 @@ getSess def = do
     s : _ -> return s
 
 datasess = 
--- words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
- words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 b62b8f cf96ab fcb952 "
+ --words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
+ words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 fcb952 b34863 cf96ab" -- fcb952 b62b8f
 
-burnIn = [("22b", 8000), ("b62", 6000), ("cf96", 4000), ("b34", 3000)]
+burnIn = [("22b", 8000), ("b62", 6000), ("cf96", 4000), 
+          ("b34", 3000), ("00c9",10000), ("84", 15000), ("572", 13000)]
 
 slopeFilter = [("0ca", 4)]
+
+startNs = [("00c9", 50), ("84", 40), ("512", 50) ]
+
+filters = [("b34", \(t,amp)-> t>5300), 
+           ("cf96", \(t,amp)-> t>400),
+           ("84b", (>500) . fst)]
 
 nsol = 4
 

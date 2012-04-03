@@ -1,0 +1,52 @@
+## Results
+
+In order to determine the locus of phenotypic synaptic plasticity, we
+performed intracellular recordings from gregarious and solitarious
+fast extensor tibiae motor neurons (FETi). The recordings were
+performed at the same time as extracellular recording of activity in
+the Descending Contralateral Movement Detector evoked by the movement
+of a small rotating disc. In addition, during these recordings we
+changed the calcium concentration in order to change the synaptic release
+probability.
+
+* here are some epsps
+
+* slow changes in synaptic strength. 
+
+* then used MPFA
+
+* probabilistic methods are known to be able to extract information
+  where ad-hoc estimators cannot. Attempted a probabilistic model for
+  all the available data.
+
+* lots of data - break model down: noise model, epsp amplitude
+  model, quantal model. Later show why this is not only convenient but
+  also necessary in this case.
+
+Based on previous work (Ditlevson), we considered an
+Ornstein-Uhlenbeck model for the membrane noise. 
+
+* corresponds to membrane equation
+
+* rewrite as gaussian process
+
+* doesn't work
+
+* add independent observation noise - brings sigma down. Can do this
+  without latent variables
+
+* differences greg and sol
+
+* posterior predictive
+
+* more accurate measurement of EPSP based on the noise process?
+
+* how to model EPSP waveform: cheat
+
+* gaussian process model
+
+* compare two measurements
+
+* quantify variance (lowess-corrected) across cells
+
+
