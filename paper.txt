@@ -9,15 +9,26 @@ of a small rotating disc. In addition, during these recordings we
 changed the calcium concentration in order to change the synaptic release
 probability.
 
-* here are some epsps
+Individual EPSPs timelocked to DCMD spikes and the average EPSP
+waveform across the entire recording duration are shown in Figure
+1A. We initially quantified the EPSP amplitude on individual trials
+using by subtracting the mean voltage during a 6 ms window centred on
+the peak of the average EPSP waveform from a 6 ms window centred 4 ms
+prior to the presynaptic spike. This measurement methodology
+implements the recommendations in Silver 2003. The timecourse of
+EPSP amplitudes measured in such a way is shown in Figure 1B. We then
+constructed the non-stationary mean-variance curve as described in
+Humeau et al. 2002. Unlike in that study, the points on our
+mean-variance plot did not obviously take the form of a parabola. It
+is likely that the extra noise in our recorded EPSPs obscured the
+theoretically predicted shape of the mean-variance curve.
 
-* slow changes in synaptic strength. 
-
-* then used MPFA
-
-* probabilistic methods are known to be able to extract information
-  where ad-hoc estimators cannot. Attempted a probabilistic model for
-  all the available data.
+Probabilistic methods are known to be able to extract information
+where ad-hoc estimators cannot (MacKay book). We therefore turned to
+building a probabilistic model for all the available data, including
+the noise process, the EPSP shape and the quantal release process, in
+an attempt to improve the estimation of the synaptic release
+parameters.
 
 * lots of data - break model down: noise model, epsp amplitude
   model, quantal model. Later show why this is not only convenient but

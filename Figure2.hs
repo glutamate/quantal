@@ -75,7 +75,7 @@ main = do
 
   puts "posterior predicted noise signals and autocorrelation\n\n"
 
-  hists <- forM datasess $ \sess -> do
+  {-hists <- forM datasess $ \sess -> do
       (wf, wfAmp, _) <- getWf sess
       vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/noise_samples")
       let ts =  HistoStyle "histeps" 50 $ map (exp . (@>0)) vsamples
@@ -91,7 +91,7 @@ main = do
   let plotIx ix lo hi =     (  ManySup $ take nsol $ getN' ix hists) 
                          :==: (   ManySup $ drop nsol $ getN' ix hists)
 
-  let lowplot = plot3h (plotIx 0 0 1) (plotIx 1 0 1) (plotIx 2 0 1)
+  let lowplot = plot3h (plotIx 0 0 1) (plotIx 1 0 1) (plotIx 2 0 1) -}
 
   fakesigs<-runRIO $ do
     vsample <- sample $ oneOf vsamples
@@ -99,12 +99,12 @@ main = do
         theta = exp $ vsample@>0
         obs = exp $ vsample @> 2
         covM = fillM (np+1,np+1) $ \(i,j)-> covOU theta sigma (toD i) (toD j)+ifObs i j obs
-    let cholm = chol $ covM
+    let cholm = L.trans $ L.chol $ covM
     sample $ sequence $ replicate 10 $ gpByChol dt tmax (\t-> 0) cholm
     
 --  plotIt "fakesigs" $ fakesigs 
 
-  let fakeNoise3 = fakesigs
+  let fakeNoise3 = map (baselineSig 0.04) fakesigs
   let fakeNoise2 = Noplot
 
 {-  covM <-runRIO $ do
@@ -130,7 +130,9 @@ main = do
   let autoCorr3 = ( Lines [LineWidth 1, LineType 1, LineColor "red"]fakeautocorr ) :+: Lines [LineWidth 5, LineType 1, LineColor "black"] [avSigs $ map autoCorrSig $ sigs] 
  
 
-  plotIt "fig2" $ ((realNoise :==: fakeNoise3) :||: autoCorr3) :==: lowplot
+  --plotIt "fig2" $ ((realNoise :==: fakeNoise3) :||: autoCorr3) :==: lowplot
+  plotIt "fig2" $ (plot3v  (C autoCorr3) (Aii fakeNoise3) (Ai realNoise)) 
+                   :||: (B $ plot3v ("theta", thetahist) ("sigma", sigmahist) ("observation", obshist))
 
 
   puts "\\end{document}"

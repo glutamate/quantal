@@ -200,7 +200,7 @@ epspSigs sess = do
      let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
      let noGood = contains ((>3)//swings) running 
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
-     let noiseSigs = take 50 $ limitSigs' (-0.06) (-0.01) $ around (spikeg) $ vm
+     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
      let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
      --let slopes = sigStat (fmap fst regressF) epspSigs
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
@@ -217,13 +217,13 @@ measNoise sess = runRIO $ do
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6], replicate 10 (-60)] 
       sigs = take 10 sigs'
+  io$ print $ tmax/dt
+  let sigpts = snd $ observe $ head sigs
+  io $ print $ L.dim sigpts
   io $ print $ posteriorNoiseV sigs initialV
   let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
   let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5} (posteriorNoiseV sigs) [] fixed initialV
   io $ print laout
-  io$ print $ tmax/dt
-  let sigpts = snd $ observe $ head sigs
-  io $ print $ L.dim sigpts
   iniampar <- if (not $ isJust mbcor) 
                  then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
                                  {-io$ print $ iniampar
