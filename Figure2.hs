@@ -40,7 +40,7 @@ plot3h x y z = Hplots [GnuplotBox x, GnuplotBox y, GnuplotBox z]
 
 
 main = do
-  let sess = "57246a"
+  let sess = "00c9bd"
   h <- openFile ("Figure2.tex") WriteMode 
   let puts = hPutStrLn h
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -63,7 +63,7 @@ main = do
 
   --plotIt "autoCorrAv" $ [avSigs $ map autoCorrSig $ sigs] 
 
-  vsamples::[L.Vector Double] <- fmap (read) $ readFile (take 6 sess++"/noise_samples")
+  vsamples::[L.Vector Double] <- fmap (drop 1000 . read) $ readFile (take 6 sess++"/noise_samples")
 
   --plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
   --plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
@@ -104,7 +104,7 @@ main = do
     
 --  plotIt "fakesigs" $ fakesigs 
 
-  let fakeNoise3 = map (baselineSig 0.04) fakesigs
+  let fakeNoise3 = map (baselineSig 0.1)  fakesigs
   let fakeNoise2 = Noplot
 
 {-  covM <-runRIO $ do
@@ -133,6 +133,11 @@ main = do
   --plotIt "fig2" $ ((realNoise :==: fakeNoise3) :||: autoCorr3) :==: lowplot
   plotIt "fig2" $ (plot3v  (C autoCorr3) (Aii fakeNoise3) (Ai realNoise)) 
                    :||: (B $ plot3v ("theta", thetahist) ("sigma", sigmahist) ("observation", obshist))
+
+
+  plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
+  plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
+  plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
 
 
   puts "\\end{document}"

@@ -57,9 +57,23 @@ main = do
 
   when ('8' `elem` dowhat) $ simulateAll [25, 50, 300] [1000,2500]
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
-  
+ 
+  when ('t' `elem` dowhat) $ testCovM
+ 
   return ()
 
+
+testCovM = do
+  print np
+  let covM = mkCovM np (-2) (2::Double) (-6) (-10)
+      row1 = L.toList $ head $ L.toRows $ fst covM
+  print $ take 10 $ row1 
+  --print $ drop (np-10) $ row1 
+
+  print $ take 10 $ L.toList $ snd covM
+--  let (inv,lndet)=L.invlndet $ fst covM 
+--  print $ snd $ L.invlndet $ fst covM 
+  return () 
 
 simulateAll nss ntrs = do 
   forM_ ntrs $ \ntr -> do
@@ -222,7 +236,7 @@ measNoise sess = runRIO $ do
   io $ print $ L.dim sigpts
   io $ print $ posteriorNoiseV sigs initialV
   let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5} (posteriorNoiseV sigs) [] fixed initialV
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 2} (posteriorNoiseV sigs) [] fixed initialV
   io $ print laout
   iniampar <- if (not $ isJust mbcor) 
                  then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
@@ -235,13 +249,13 @@ measNoise sess = runRIO $ do
                                                                  (posteriorNoiseV sigs init2) 5 2
                                    runAdaMetRIO 400 False ampar $ posteriorNoiseV sigs -}
                                    sample $ initialAdaMetFromCov 200 (posteriorNoiseV sigs) init2 
-                                                                    (L.scale (1/5) (posdefify $ fromJust mbcor)) 
+                                                                    (L.scale (1.0) (posdefify $ fromJust mbcor)) 
 
   io$ print $ iniampar
   {-froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
                                                            adaMet False (posteriorNoiseV sigs) 
   io$ print $ froampar -}
-  vsamples <- runAdaMetRIO 4000 False (posDefCov $ iniampar {scaleFactor = 1.5}) (posteriorNoiseV sigs) 
+  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2}) (posteriorNoiseV sigs) 
   let [logtheta, sigma, logobs ] = L.toList$ L.subVector 0 3 $ runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples

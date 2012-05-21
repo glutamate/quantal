@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, NoMonomorphismRestriction, ViewPatterns, PackageImports #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, NoMonomorphismRestriction, ViewPatterns, PackageImports, BangPatterns #-}
 module QuantalHelp where
 import "probably" Math.Probably.MCMC
 import "probably" Math.Probably.StochFun
@@ -93,7 +93,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 0.10
+tmax = 0.02
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -102,7 +102,7 @@ ifObs = \i-> \j-> \sig-> if (i==j) then sig else 0.000
 gpByInvLogPdf = \(_) -> \(_) -> \meansig-> \lndet-> \covinv-> \obssig-> let ((dt,_),obsvec) = observe obssig; meanVec = (fillV np)$(\i-> meansig (toD i)) in ((mvnPdf lndet covinv) meanVec) obsvec
 
 posteriorNoiseV sigs v = 
-  let covM=fillM (np',np') $ \(i,j)-> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac i)*dt)-((realToFrac j)*dt))))))+(if (i==j) then (exp logobs) else 0.000)) 
+  let covM= fst $ mkCovM np' sigma logtheta logobs smoothsd
       (inv,lndet)=invlndet covM 
   in uniformLogPdf (0.000-50.000) (100.000) logtheta
  +uniformLogPdf (0.000) (10.000) sigma
@@ -112,14 +112,45 @@ posteriorNoiseV sigs v =
   where logtheta = v@> 0
         sigma = v@> 1
         logobs = v@> 2
+        smoothsd = exp $ v@> 3
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
         tmax' = realToFrac np' * dt 
         means = L.toList $ L.subVector 3 10 v
 
+mkCovM np' sigma logtheta logobs smoothsd = (covm', wdiff) where
+  line1V = fillV np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
+
+  wdiff = fillV 20 $ \(j) -> exp $ PDF.gauss 0 (exp smoothsd) (realToFrac j * dt)
+      
+  --line3V = fillV np' $ \(i) -> L.foldVectorWithIndex (\j val acc -> acc+ val * (wdiff L.@> (abs $ i-j))) 0 line1V
+
+  line4V = fillV np' h 
+
+  h i =
+     let otherixs = [max 0 (i-2)..min (np'-1) (i+2)] 
+         (v, wsum) = foldl' (\(!accv, !accw) (nv, nw) -> (nv*nw+accv, nw+accw)) (0,0) $ map (g i) otherixs
+        {-(v, wsum) = L.foldVector (\(nv, nw) (!accv, !accw) -> (nv*nw+accv, nw+accw)) (0,0) 
+                        $ L.mapVector (f i) $ L.buildVector 5 $ \z-> z+i-2  -}
+     in {-trace ((show otherixs) ++ "\n" ++(show $ map (g i) otherixs)++ "\n" ++(show (v,wsum))) $ -} v/wsum
+  
+{-  f i j | j < 0 = (0,0) 
+        | j >= np = (0,0)
+        | otherwise = (line1V L.@> j, wdiff L.@> (abs $ i-j)) -}
+
+  g i j = (line1V L.@> (min 0 j), wdiff L.@> (abs $ i-j))
+
+
+  covm' = trace (show $ h 10)  $ fillM (np',np') $ \(i,j)-> line4V L.@> (abs $ i-j)
+
 unSig (Signal _ _ sigv1) = sigv1
 
+sumVec = L.foldVector (+) 0
+
 (@>) = (L.@>)
+
+
+--  covm = fillM (np',np') $ \(i,j)-> line1V @> (abs $ i-j)
 
 ouSynapseLogPdf (covinv, lndet) 
       = \meansig-> \obssig-> let (_,obsvec) = observe obssig
