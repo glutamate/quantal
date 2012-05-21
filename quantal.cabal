@@ -1,0 +1,22 @@
+Name:                quantal
+Version:             0.1
+Description:         Tom's utility functions
+License:             BSD3
+License-file:        LICENSE
+Author:              Tom Nielsen
+Maintainer:          tanielsen@gmail.com
+build-type:          Simple
+
+
+
+Executable quantal
+   Main-Is:             Quantal.hs
+   ghc-options:         -O2 -auto-all -rtsopts -with-rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl, 
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig
+
+--Executable hsbibtex
+--   Main-Is:             hsbibtex.hs
+--   Build-depends:       base, bibtex, parsec

@@ -51,7 +51,7 @@ main = do
   when ('6' `elem` dowhat) $ simulate sess rest
   when ('3' `elem` dowhat) $ measAmps sess
   when ('4' `elem` dowhat) $ measNPQ sess
-  when ('5' `elem` dowhat) $ summary sess
+--  when ('5' `elem` dowhat) $ summary sess
 
 --  when ('7' `elem` dowhat) $ measAmps1 sess
 
@@ -97,7 +97,7 @@ simulate sess rest = runRIO $ do
   io $ writeFile (take 6 sess++"/sessions") $ show [sess]
  
 
-summary sess = do
+{-summary sess = do
   changeWorkingDirectory $ take 6 sess
   h <- openFile (take 6 sess++".tex") WriteMode 
   let puts = hPutStrLn h
@@ -201,7 +201,7 @@ summary sess = do
 
   system $ "pdflatex "++take 6 sess++".tex"
   return ()
-
+-}
 epspSigs sess = do 
   nms <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
      rebaseRelativeTo sess
