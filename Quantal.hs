@@ -34,6 +34,8 @@ import Graphics.Gnewplot.Instances
 import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
+import qualified Data.Array.IArray as IA
+
 
 import "probably" Math.Probably.IterLap
 
@@ -65,12 +67,12 @@ main = do
 
 testCovM = do
   print np
-  let covM = mkCovM np (-2) (2::Double) (-6) (-10)
+  let covM = mkCovM np (-2) (2::Double) (-6) (-9)
       row1 = L.toList $ head $ L.toRows $ fst covM
   print $ take 10 $ row1 
   --print $ drop (np-10) $ row1 
 
-  print $ take 10 $ L.toList $ snd covM
+  print $ take 10 $ IA.elems $ snd covM
 --  let (inv,lndet)=L.invlndet $ fst covM 
 --  print $ snd $ L.invlndet $ fst covM 
   return () 
@@ -229,7 +231,7 @@ epspSigs sess = do
 
 measNoise sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6], replicate 10 (-60)] 
+  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -9], replicate 10 (-60)] 
       sigs = take 10 sigs'
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
@@ -256,8 +258,8 @@ measNoise sess = runRIO $ do
                                                            adaMet False (posteriorNoiseV sigs) 
   io$ print $ froampar -}
   vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2}) (posteriorNoiseV sigs) 
-  let [logtheta, sigma, logobs ] = L.toList$ L.subVector 0 3 $ runStat meanF vsamples
-  io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs)
+  let [logtheta, sigma, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
+  io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs, logsmooth)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
   return ()
 

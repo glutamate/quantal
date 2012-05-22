@@ -6,12 +6,12 @@ License-file:        LICENSE
 Author:              Tom Nielsen
 Maintainer:          tanielsen@gmail.com
 build-type:          Simple
-
+cabal-version: >= 1.2
 
 
 Executable quantal
    Main-Is:             Quantal.hs
-   ghc-options:         -O2 -auto-all -rtsopts -with-rtsopts
+   ghc-options:         -O2 -auto-all -rtsopts
 
    Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl, 
                         process, unix, binary, storablevector, storable-tuple,

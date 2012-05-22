@@ -5,7 +5,7 @@ import "probably" Math.Probably.StochFun
 import "probably" Math.Probably.Sampler
 import "probably" Math.Probably.FoldingStats
 import Control.Monad
-import Data.Array
+--import Data.Array
 --import qualified Statistics.Math as SM
 import qualified Math.Probably.Student as S
 import qualified Data.StorableVector as SV
@@ -22,6 +22,7 @@ import "probably" Math.Probably.RandIO
 import "probably" Math.Probably.NelderMead
 import Data.List
 import System.Environment
+import Data.Array.IArray
 
 import Data.Binary
 
@@ -93,7 +94,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 0.02
+tmax = 0.1
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -118,30 +119,31 @@ posteriorNoiseV sigs v =
         tmax' = realToFrac np' * dt 
         means = L.toList $ L.subVector 3 10 v
 
-mkCovM np' sigma logtheta logobs smoothsd = (covm', wdiff) where
-  line1V = fillV np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
+mkCovM np' sigma logtheta logobs smoothsd = 
+  let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
 
-  wdiff = fillV 20 $ \(j) -> exp $ PDF.gauss 0 (exp smoothsd) (realToFrac j * dt)
+      wdiff = L.buildVector 20 $ \(j) -> exp $ PDF.gauss 0 (exp smoothsd) (realToFrac j * dt)
       
   --line3V = fillV np' $ \(i) -> L.foldVectorWithIndex (\j val acc -> acc+ val * (wdiff L.@> (abs $ i-j))) 0 line1V
 
-  line4V = fillV np' h 
+      line4V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
-  h i =
-     let otherixs = [max 0 (i-2)..min (np'-1) (i+2)] 
-         (v, wsum) = foldl' (\(!accv, !accw) (nv, nw) -> (nv*nw+accv, nw+accw)) (0,0) $ map (g i) otherixs
+      h i =
+        let otherixs = [max 0 (i-2)..min (np'-1) (i+2)] 
+            (v, wsum) = foldl' (\(!accv, !accw) (nv, nw) -> (nv*nw+accv, nw+accw)) (0,0) $ map (g i) otherixs
         {-(v, wsum) = L.foldVector (\(nv, nw) (!accv, !accw) -> (nv*nw+accv, nw+accw)) (0,0) 
                         $ L.mapVector (f i) $ L.buildVector 5 $ \z-> z+i-2  -}
-     in {-trace ((show otherixs) ++ "\n" ++(show $ map (g i) otherixs)++ "\n" ++(show (v,wsum))) $ -} v/wsum
+        in {-trace ((show otherixs) ++ "\n" ++(show $ map (g i) otherixs)++ "\n" ++(show (v,wsum))) $ -} v/wsum
   
 {-  f i j | j < 0 = (0,0) 
         | j >= np = (0,0)
         | otherwise = (line1V L.@> j, wdiff L.@> (abs $ i-j)) -}
 
-  g i j = (line1V L.@> (min 0 j), wdiff L.@> (abs $ i-j))
+      g i j = (line1V L.@> j, wdiff L.@> (abs $ i-j))
 
 
-  covm' = trace (show $ h 10)  $ fillM (np',np') $ \(i,j)-> line4V L.@> (abs $ i-j)
+      covm' = fillM (np',np') $ \(i,j)-> line4V ! (abs $ i-j)
+  in (covm', line4V) 
 
 unSig (Signal _ _ sigv1) = sigv1
 
