@@ -26,6 +26,8 @@ import Data.Array.IArray
 
 import Data.Binary
 
+import Control.Spoon
+
 import Query hiding (io) 
 import QueryTypes
 import QueryUtils hiding (averageSigs)
@@ -94,7 +96,7 @@ alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOU = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
 dt = 5.000e-5
-tmax = 0.1
+tmax = 0.05
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
 
@@ -104,20 +106,23 @@ gpByInvLogPdf = \(_) -> \(_) -> \meansig-> \lndet-> \covinv-> \obssig-> let ((dt
 
 posteriorNoiseV sigs v = 
   let covM= fst $ mkCovM np' sigma logtheta logobs smoothsd
-      (inv,lndet)=invlndet covM 
-  in uniformLogPdf (0.000-50.000) (100.000) logtheta
- +uniformLogPdf (0.000) (10.000) sigma
- +uniformLogPdf (0.000-50.000) (100.000) logobs
--- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
- +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
+  in case spoon $ invlndet covM of
+                        Just (inv,lndet) -> dens (inv,lndet)
+                        _ -> -1000000 -- error $"invlndet: "++show v
+  
   where logtheta = v@> 0
         sigma = v@> 1
         logobs = v@> 2
-        smoothsd = exp $ v@> 3
+        smoothsd = v@> 3
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
         tmax' = realToFrac np' * dt 
-        means = L.toList $ L.subVector 3 10 v
+        means = L.toList $ L.subVector 4 10 v
+        dens (inv,lndet) = uniformLogPdf (0.000-50.000) (100.000) logtheta
+                +uniformLogPdf (0.000) (10.000) sigma
+                +uniformLogPdf (0.000-50.000) (100.000) logobs
+-- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
+                +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
 
 mkCovM np' sigma logtheta logobs smoothsd = 
   let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
@@ -129,7 +134,7 @@ mkCovM np' sigma logtheta logobs smoothsd =
       line4V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
       h i =
-        let otherixs = [max 0 (i-2)..min (np'-1) (i+2)] 
+        let otherixs = [max 0 (i-4)..min (np'-1) (i+4)] 
             (v, wsum) = foldl' (\(!accv, !accw) (nv, nw) -> (nv*nw+accv, nw+accw)) (0,0) $ map (g i) otherixs
         {-(v, wsum) = L.foldVector (\(nv, nw) (!accv, !accw) -> (nv*nw+accv, nw+accw)) (0,0) 
                         $ L.mapVector (f i) $ L.buildVector 5 $ \z-> z+i-2  -}
@@ -219,8 +224,10 @@ fastNPQ pdfN n0 par0 = fN initLike (n0-1) par0 where
                         like = pdf maxV
                       in  trace ("laplace"++show n++": "++show maxV++" lh="++show like) $ (like, maxV, smplx)
 
+
+sigAv (Signal _ _ lv) = runStat meanF $ L.toList lv
        
-posDefCov ampar = ampar { ampCov = posdefify $ ampCov ampar}
+posDefCov ampar = ampar { ampCov = PDF.posdefify $ ampCov ampar}
 
 augmentSimplex n = map f where
    f (vec, like) = (L.join [morev, vec], like)
@@ -354,7 +361,7 @@ stagger (i, Signal dt t0 sig) = Signal dt i sig
 pad (c:[]) = '0':c:[]
 pad cs = cs
 
-fst3 (x,_,_) = x
+--fst3 (x,_,_) = x
 
 whenContinues sess mma = do
       conts <- durations "continues" "foo"

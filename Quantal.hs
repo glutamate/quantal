@@ -19,6 +19,7 @@ import qualified Numeric.LinearAlgebra as L
 import "probably" Math.Probably.MCMC
 import "probably" Math.Probably.Sampler
 import "probably" Math.Probably.FoldingStats
+import qualified Math.Probably.PDF as PDF
 import "probably" Math.Probably.NelderMead
 
 import System.IO
@@ -60,19 +61,26 @@ main = do
   when ('8' `elem` dowhat) $ simulateAll [25, 50, 300] [1000,2500]
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
  
-  when ('t' `elem` dowhat) $ testCovM
+  when ('t' `elem` dowhat) $ testCovM sess
  
   return ()
 
 
-testCovM = do
-  print np
-  let covM = mkCovM np (-2) (2::Double) (-6) (-9)
+testCovM sess = runRIO $ do
+  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
+  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -9], replicate 10 (-60)] 
+      sigs = take 10 sigs'
+  io$ print $ tmax/dt
+  let sigpts = snd $ observe $ head sigs
+  io $ print $ L.dim sigpts
+  io $ print $ posteriorNoiseV sigs initialV
+
+  {-let covM = mkCovM np (-2) (2::Double) (-6) (-9)
       row1 = L.toList $ head $ L.toRows $ fst covM
   print $ take 10 $ row1 
   --print $ drop (np-10) $ row1 
 
-  print $ take 10 $ IA.elems $ snd covM
+  print $ take 10 $ IA.elems $ snd covM -}
 --  let (inv,lndet)=L.invlndet $ fst covM 
 --  print $ snd $ L.invlndet $ fst covM 
   return () 
@@ -216,7 +224,7 @@ epspSigs sess = do
      let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
      let noGood = contains ((>3)//swings) running 
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
-     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
+     let noiseSigs = take 50 $ limitSigs' (0 - tmax- 0.01) (-0.01) $ around (spikeg) $ vm
      let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
      --let slopes = sigStat (fmap fst regressF) epspSigs
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
@@ -231,17 +239,20 @@ epspSigs sess = do
 
 measNoise sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -9], replicate 10 (-60)] 
-      sigs = take 10 sigs'
+  let sigs = take 10 sigs'
+      initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -8], map sigAv sigs]       
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
   io $ print $ L.dim sigpts
   io $ print $ posteriorNoiseV sigs initialV
-  let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 2} (posteriorNoiseV sigs) [] fixed initialV
+  let fixed = [((i,j),0) | i <- [4..14], j <- [4..14], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 100, 
+                                                        initw = (\n -> if n<=3 then 0.000002 else 0.00001)} 
+                                             (posteriorNoiseV sigs) [] fixed initialV
   io $ print laout
+  io $ print $ posteriorNoiseV sigs init2
   iniampar <- if (not $ isJust mbcor) 
-                 then         do {-iniampar <- -}sample $ initialAdaMet 50 1e-3 (posteriorNoiseV sigs) init2
+                 then         do {-iniampar <- -}sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV sigs) init2
                                  {-io$ print $ iniampar
                                  froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
                                                            adaMet False (posteriorNoiseV sigs)
@@ -250,14 +261,15 @@ measNoise sess = runRIO $ do
                  else           do {-let ampar = shrink 10 $ AMPar init2 init2 (posdefify $ fromJust mbcor) 
                                                                  (posteriorNoiseV sigs init2) 5 2
                                    runAdaMetRIO 400 False ampar $ posteriorNoiseV sigs -}
-                                   sample $ initialAdaMetFromCov 200 (posteriorNoiseV sigs) init2 
-                                                                    (L.scale (1.0) (posdefify $ fromJust mbcor)) 
+                                   sample $ initialAdaMetFromCov 400 (posteriorNoiseV sigs) init2 
+                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
+  --iniampar <- sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV sigs) init2
 
   io$ print $ iniampar
   {-froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
                                                            adaMet False (posteriorNoiseV sigs) 
   io$ print $ froampar -}
-  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2}) (posteriorNoiseV sigs) 
+  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2, ampCov = L.scale (1.0) $ ampCov iniampar}) (posteriorNoiseV sigs) 
   let [logtheta, sigma, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs, logsmooth)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
@@ -353,7 +365,7 @@ measNPQ sess = runRIO $ do
       nfrozen = 200000
 
 
-  iniampar <- sample $ initialAdaMet 500 5e-3 (posteriorNPQV amps pcurve globalSd) maxFullV
+  iniampar <- sample $ initialAdaMet 500 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
   io $ putStr "inipar ="
   io $ print $ iniampar 
   {-topAll <- runAndDiscard nsam (showNPQV') iniampar $ adaMet False  (posteriorNPQV amps pcurve globalSd)

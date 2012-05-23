@@ -15,7 +15,7 @@ Executable quantal
 
    Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl, 
                         process, unix, binary, storablevector, storable-tuple,
-                        array, directory, baysig
+                        array, directory, baysig, spoon
 
 --Executable hsbibtex
 --   Main-Is:             hsbibtex.hs
