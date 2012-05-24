@@ -34,12 +34,44 @@ parameters.
   model, quantal model. Later show why this is not only convenient but
   also necessary in this case.
 
-Based on previous work (Ditlevson), we considered an
-Ornstein-Uhlenbeck model for the membrane noise. 
+Based on previous work (Ditlevson), we first considered an
+Ornstein-Uhlenbeck model for the membrane noise. Such a model
+describes an RC circuit in parallel with a white noise current source,
+and is governed by the stochastic differential equation 
 
-* corresponds to membrane equation
+\begin{math}
 
-* rewrite as gaussian process
+C dV = ...
+
+\end{math}
+
+where the first term on the right-hand side corresponds to the
+standard membrane equation and the second term is the infinitesimal
+increment of the wiener process, or informally
+
+In order to estimate parameters theta and sigma, we used the
+equivalent gaussian process with covariance function
+
+\begin{math}
+
+\end{math}
+
+This gave us a direct expression for the likelihood of observing a
+vector v corresponding to the membrane voltage sampled with a fixed
+interval:
+
+\begin{math}
+
+L(v|..) = N(vmean, C)
+
+\end{math}
+
+Using Bayesian inference based on markov chain monte carlo, we were
+able to estimate parameters theta and sigma from recordings from
+locust neurons. We then assessed the quality of this model by
+simulating random voltage traces using parameters drawn from these
+estimates (the posterior). We compared these traces to the
+experimentally observed traces. 
 
 * doesn't work
 

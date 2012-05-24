@@ -49,7 +49,7 @@ main = do
   createDirectoryIfMissing False $ take 6 sess
 
   when ('1' `elem` dowhat) $ epspSigs sess
-  when ('2' `elem` dowhat) $ measNoise sess
+  when ('2' `elem` dowhat) $ measNoise3 sess
 
   when ('6' `elem` dowhat) $ simulate sess rest
   when ('3' `elem` dowhat) $ measAmps sess
@@ -62,7 +62,9 @@ main = do
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
  
   when ('t' `elem` dowhat) $ testCovM sess
- 
+  when ('a' `elem` dowhat) $ measNoise1 sess
+  when ('b' `elem` dowhat) $ measNoise2 sess
+
   return ()
 
 
@@ -73,7 +75,7 @@ testCovM sess = runRIO $ do
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
   io $ print $ L.dim sigpts
-  io $ print $ posteriorNoiseV sigs initialV
+  io $ print $ posteriorNoiseV3 sigs initialV
 
   {-let covM = mkCovM np (-2) (2::Double) (-6) (-9)
       row1 = L.toList $ head $ L.toRows $ fst covM
@@ -237,42 +239,100 @@ epspSigs sess = do
      return $ Just sessionIdentifier
   writeFile (take 6 sess++"/sessions") $ show nms
 
-measNoise sess = runRIO $ do 
+measNoise3 sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let sigs = take 10 sigs'
-      initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -8], map sigAv sigs]       
+      initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -10], map sigAv sigs]    
+  
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
   io $ print $ L.dim sigpts
-  io $ print $ posteriorNoiseV sigs initialV
+  io $ print initialV
+  io $ print $ posteriorNoiseV3 sigs initialV
+  --io $ print $ posteriorNoiseV sigs initial1
+  --io $ print $ posteriorNoiseV sigs initial2
+  --fail "foo" 
   let fixed = [((i,j),0) | i <- [4..14], j <- [4..14], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 100, 
-                                                        initw = (\n -> if n<=3 then 0.000002 else 0.00001)} 
-                                             (posteriorNoiseV sigs) [] fixed initialV
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
+                                                        initw = (\n -> if n<=3 then 0.002 else 0.01)} 
+                                             (posteriorNoiseV3 sigs) [] fixed initialV
   io $ print laout
-  io $ print $ posteriorNoiseV sigs init2
+  io $ print $ posteriorNoiseV3 sigs init2
   iniampar <- if (not $ isJust mbcor) 
-                 then         do {-iniampar <- -}sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV sigs) init2
-                                 {-io$ print $ iniampar
-                                 froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
-                                                           adaMet False (posteriorNoiseV sigs)
-                                 io$ print $ froampar
-                                 runAdaMetRIO 400 False iniampar (posteriorNoiseV sigs) -}
-                 else           do {-let ampar = shrink 10 $ AMPar init2 init2 (posdefify $ fromJust mbcor) 
-                                                                 (posteriorNoiseV sigs init2) 5 2
-                                   runAdaMetRIO 400 False ampar $ posteriorNoiseV sigs -}
-                                   sample $ initialAdaMetFromCov 400 (posteriorNoiseV sigs) init2 
+                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV3 sigs) init2
+                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV3 sigs) init2 
                                                                     (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
-  --iniampar <- sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV sigs) init2
+ --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2
 
   io$ print $ iniampar
-  {-froampar <- runAndDiscard 400 (show . ampPar) iniampar $ 
-                                                           adaMet False (posteriorNoiseV sigs) 
-  io$ print $ froampar -}
-  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2, ampCov = L.scale (1.0) $ ampCov iniampar}) (posteriorNoiseV sigs) 
+  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2, ampCov = L.scale (1.0) $ ampCov iniampar}) (posteriorNoiseV3 sigs) 
   let [logtheta, sigma, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
   io $ writeFile (take 6 sess++"/noisePars") $ show (logtheta, sigma, logobs, logsmooth)
   io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
+  return ()
+
+measNoise2 sess = runRIO $ do 
+  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
+  let sigs = take 10 sigs'
+      initialV = L.join $ map L.fromList [ [-2, 2::Double, -6], map sigAv sigs]    
+  
+  io$ print $ tmax/dt
+  let sigpts = snd $ observe $ head sigs
+  io $ print $ L.dim sigpts
+  io $ print initialV
+  io $ print $ posteriorNoiseV2 sigs initialV
+  --io $ print $ posteriorNoiseV sigs initial1
+  --io $ print $ posteriorNoiseV sigs initial2
+  --fail "foo" 
+  let fixed = [((i,j),0) | i <- [4..14], j <- [4..14], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
+                                                        initw = (\n -> if n<=2 then 0.002 else 0.01)} 
+                                             (posteriorNoiseV2 sigs) [] fixed initialV
+  io $ print laout
+  io $ print $ posteriorNoiseV2 sigs init2
+  iniampar <- if (not $ isJust mbcor) 
+                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV2 sigs) init2
+                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV2 sigs) init2 
+                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
+ --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2
+
+  io$ print $ iniampar
+  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2, ampCov = L.scale (1.0) $ ampCov iniampar}) (posteriorNoiseV2 sigs) 
+  let [logtheta, sigma, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
+  io $ writeFile (take 6 sess++"/noisePars2") $ show (logtheta, sigma, logobs, logsmooth)
+  io $ writeFile (take 6 sess++"/noise_samples2") $ show vsamples
+  return ()
+
+measNoise1 sess = runRIO $ do 
+  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
+  let sigs = take 10 sigs'
+      initialV = L.join $ map L.fromList [ [-2, 2::Double], map sigAv sigs]    
+  
+  io$ print $ tmax/dt
+  let sigpts = snd $ observe $ head sigs
+  io $ print $ L.dim sigpts
+  io $ print initialV
+  io $ print $ posteriorNoiseV1 sigs initialV
+  --io $ print $ posteriorNoiseV sigs initial1
+  --io $ print $ posteriorNoiseV sigs initial2
+  --fail "foo" 
+  let fixed = [((i,j),0) | i <- [4..14], j <- [4..14], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
+                                                        initw = (\n -> if n<=1 then 0.002 else 0.01)} 
+                                             (posteriorNoiseV1 sigs) [] fixed initialV
+  io $ print laout
+  io $ print $ posteriorNoiseV1 sigs init2
+  iniampar <- if (not $ isJust mbcor) 
+                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV1 sigs) init2
+                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV1 sigs) init2 
+                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
+ --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2
+
+  io$ print $ iniampar
+  vsamples <- runAdaMetRIO 6000 False (posDefCov $ iniampar {scaleFactor = 2, ampCov = L.scale (1.0) $ ampCov iniampar}) (posteriorNoiseV1 sigs) 
+  let [logtheta, sigma, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
+  io $ writeFile (take 6 sess++"/noisePars1") $ show (logtheta, sigma, logobs, logsmooth)
+  io $ writeFile (take 6 sess++"/noise_samples1") $ show vsamples
   return ()
 
 measAmps sess = runRIO $ do
