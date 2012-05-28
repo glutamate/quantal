@@ -105,13 +105,13 @@ ifObs = \i-> \j-> \sig-> if (i==j) then sig else 0.000
 gpByInvLogPdf = \(_) -> \(_) -> \meansig-> \lndet-> \covinv-> \obssig-> let ((dt,_),obsvec) = observe obssig; meanVec = (fillV np)$(\i-> meansig (toD i)) in ((mvnPdf lndet covinv) meanVec) obsvec
 
 posteriorNoiseV3 sigs v = 
-  let covM= fst $ mkCovM3 np' sigma logtheta logobs smoothsd
-  in case spoon $ invlndet covM of
+  let covM= mkCovM np' $ take 4 $ L.toList v 
+  in case spoon $ invlndetC covM of
                         Just (inv,lndet) -> dens (inv,lndet)
                         _ -> -1000000 -- error $"invlndet: "++show v
   
-  where logtheta = v@> 0
-        sigma = v@> 1
+  where sigma = v@> 0
+        logtheta = v@> 1
         logobs = v@> 2
         smoothsd = v@> 3
         Signal _ _ sigv1 : _ = sigs
@@ -125,13 +125,13 @@ posteriorNoiseV3 sigs v =
                 +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
 
 posteriorNoiseV2 sigs v = 
-  let covM= fst $ mkCovM2 np' sigma logtheta logobs 
-  in case spoon $ invlndet covM of
+  let covM= mkCovM np' $ take 3 $ L.toList v 
+  in case spoon $ invlndetC covM of
                         Just (inv,lndet) -> dens (inv,lndet)
                         _ -> -1000000 -- error $"invlndet: "++show v
   
-  where logtheta = v@> 0
-        sigma = v@> 1
+  where sigma = v@> 0
+        logtheta = v@> 1
         logobs = v@> 2
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
@@ -144,13 +144,13 @@ posteriorNoiseV2 sigs v =
                 +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
 
 posteriorNoiseV1 sigs v = 
-  let covM= fst $ mkCovM1 np' sigma logtheta  
-  in case spoon $ invlndet covM of
+  let covM= mkCovM np' $ take 2 $ L.toList v 
+  in case spoon $ invlndetC covM of
                         Just (inv,lndet) -> dens (inv,lndet)
                         _ -> -1000000 -- error $"invlndet: "++show v
   
-  where logtheta = v@> 0
-        sigma = v@> 1
+  where sigma = v@> 0
+        logtheta = v@> 1
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
         tmax' = realToFrac np' * dt 
@@ -160,20 +160,27 @@ posteriorNoiseV1 sigs v =
 -- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
                 +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
 
-mkCovM2 np' sigma logtheta logobs  = 
-  let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
+mkCovM np' [sigma,logtheta,logobs]  = 
+  let h ij = ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
 
-      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V L.@> (abs $ i-j)
-  in (covm', line1V) 
+      line1V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
-mkCovM1 np' sigma logtheta  = 
-  let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt)))))))
+      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
+  in covm' 
 
-      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V L.@> (abs $ i-j)
-  in (covm', line1V) 
+mkCovM np' [sigma,logtheta]  = 
 
 
-mkCovM3 np' sigma logtheta logobs smoothsd = 
+  let h ij =  ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt)))))))
+
+      line1V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
+
+
+      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
+  in covm' 
+
+
+mkCovM np' [sigma,logtheta,logobs,smoothsd] = 
   let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
 
       wdiff = L.buildVector 20 $ \(j) -> exp $ PDF.gauss 0 (exp smoothsd) (realToFrac j * dt)
@@ -197,7 +204,7 @@ mkCovM3 np' sigma logtheta logobs smoothsd =
 
 
       covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line4V ! (abs $ i-j)
-  in (covm', line4V) 
+  in covm' 
 
 unSig (Signal _ _ sigv1) = sigv1
 
@@ -205,6 +212,14 @@ sumVec = L.foldVector (+) 0
 
 (@>) = (L.@>)
 
+--'luSolve' . 'luPacked'
+
+invlndetC :: Matrix Double -> (Matrix Double, Double)
+invlndetC m = (im, lndet)
+  where c = L.chol  m
+        im = L.cholSolve c $ L.ident (L.rows m)
+        prod = L.foldVector (\x acc -> acc+ log x) 0 $ L.takeDiag c
+        lndet = 2* prod 
 
 --  covm = fillM (np',np') $ \(i,j)-> line1V @> (abs $ i-j)
 
@@ -397,7 +412,7 @@ fakesam simn ntrials = return 0.150>>=(\cv->
             let p = phi-((phi-plo)/(1.000+(exp (soffset*sslope-sslope*realToFrac i)))) 
             in ((((binGauss simn p) q) cv) 0.000)>>=(\amp-> 
                (return (0-60.000))>>=(\vstart-> 
-               ((gpByChol dt tmax) 
+               ((gpByChol dt) 
                           (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 
                           cholm))))))))
   where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat

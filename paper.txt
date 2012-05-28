@@ -58,20 +58,15 @@ equivalent gaussian process with covariance function
 
 This gave us a direct expression for the likelihood of observing a
 vector v corresponding to the membrane voltage sampled with a fixed
-interval:
+interval. 
 
-\begin{math}
-
-L(v|..) = N(vmean, C)
-
-\end{math}
 
 Using Bayesian inference based on markov chain monte carlo, we were
 able to estimate parameters theta and sigma from recordings from
 locust neurons. We then assessed the quality of this model by
 simulating random voltage traces using parameters drawn from these
 estimates (the posterior). We compared these traces to the
-experimentally observed traces. 
+experimentally observed voltage traces. 
 
 * doesn't work
 
