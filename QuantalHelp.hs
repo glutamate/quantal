@@ -112,12 +112,13 @@ posteriorNoiseV 1 sigs v =
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
         tmax' = realToFrac np' * dt 
-        means = L.toList $ L.subVector 1 10 v
+        --means = L.toList $ L.subVector 1 10 v
+        vmean = last $ L.toList $ v
         dens (inv,lndet) = 
 --                uniformLogPdf (0.000) (10.000) sigma
                 
 -- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
-                (sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
+                (sum $ (flip map) (zip [1..10] sigs) $ \(i, sigv)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) sigv)
 
 posteriorNoiseV npars sigs v = 
   let covM= mkCovM np' $ take npars $ L.toList v 
@@ -129,53 +130,55 @@ posteriorNoiseV npars sigs v =
         Signal _ _ sigv1 : _ = sigs
         np' =  L.dim sigv1
         tmax' = realToFrac np' * dt 
-        means = L.toList $ L.subVector npars 10 v
+        vmean = last $ L.toList $ v
         dens (inv,lndet) = 
                 uniformLogPdf (0.000) (10.000) sigma
                 
 -- +uniformLogPdf (0.000-80.000) (0.000-40.000) vmean
-                +(sum $ (flip map) (zip3 [1..10] sigs means) $ \(i, sigv, vmean)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) (sigv))
+                +(sum $ (flip map) (zip [1..10] sigs ) $ \(i, sigv)->gpByInvLogPdf (dt) (tmax') (\y-> vmean) (lndet) (inv) sigv)
+
+
+sigSub x (Signal dt t0 vec) = Signal dt t0 $ L.mapVector (\val -> val - x) vec 
+
+--vOU :: Double -> DO
+covOU sigma logtheta ij = (sigma*sigma*0.500/theta)*(exp (-theta*(abs (realToFrac ij*dt))))
+  where theta = exp logtheta
 
 
 mkCovM np' [sigma,logtheta,logobs]  = 
-  let h ij = ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
+  let h ij = covOU sigma logtheta ij + if ij==0 then (exp logobs) else 0.000 
 
       line1V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
-      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
+      covm' = fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
   in covm' 
 
 mkCovM np' [sigma,logtheta]  = 
-
-
-  let h ij =  ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt)))))))
+  let h ij =  covOU sigma logtheta ij 
 
       line1V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
-
-      covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
+      covm' = fillM (np',np') $ \(i,j)-> line1V ! (abs $ i-j)
   in covm' 
 
 mkCovM np' [logvar]  = 
-  let covm' = {-trace (show (take 10 $ L.toList wdiff) ++ "\n" ++ show (take 10 $ L.toList line1V) ++ "\n" ++ show (take 10 $ elems line4V)) $ -} fillM (np',np') $ \(i,j)-> if i==j then exp logvar else 0
+  let covm' = fillM (np',np') $ \(i,j)-> if i==j then exp logvar else 0
   in covm' 
 
 
 mkCovM np' [sigma,logtheta,logobs,smoothsd] = 
-  let line1V = L.buildVector np' $ \(ij) -> ((((sigma*sigma)*0.500)/(exp logtheta))*(exp (0.000-((exp logtheta)*(abs (((realToFrac ij)*dt))))))+(if (ij==0) then (exp logobs) else 0.000)) 
+  let line1V = L.buildVector np' $ \(ij) -> covOU sigma logtheta ij + if ij==0 then (exp logobs) else 0.000 
 
       wdiff = L.buildVector 20 $ \(j) -> exp $ PDF.gauss 0 (exp smoothsd) (realToFrac j * dt)
       
-  --line3V = fillV np' $ \(i) -> L.foldVectorWithIndex (\j val acc -> acc+ val * (wdiff L.@> (abs $ i-j))) 0 line1V
 
       line4V :: Array Int Double = listArray (0, np'-1) $ map h [0..np'-1]
 
       h i =
         let otherixs = [max 0 (i-4)..min (np'-1) (i+4)] 
             (v, wsum) = foldl' (\(!accv, !accw) (nv, nw) -> (nv*nw+accv, nw+accw)) (0,0) $ map (g i) otherixs
-        {-(v, wsum) = L.foldVector (\(nv, nw) (!accv, !accw) -> (nv*nw+accv, nw+accw)) (0,0) 
-                        $ L.mapVector (f i) $ L.buildVector 5 $ \z-> z+i-2  -}
-        in {-trace ((show otherixs) ++ "\n" ++(show $ map (g i) otherixs)++ "\n" ++(show (v,wsum))) $ -} v/wsum
+
+        in v/wsum
   
 {-  f i j | j < 0 = (0,0) 
         | j >= np = (0,0)
@@ -384,7 +387,7 @@ sigmaHat = 1.6 --6.260
 obsHat = 2.7e-4
 
 
-{-fakesam simn ntrials = return 0.150>>=(\cv-> 
+fakesam simn ntrials = return 0.150>>=(\cv-> 
         (return 0.800)>>=(\phi-> 
         (return 0.200)>>=(\plo-> 
         (return (simq*(100/realToFrac simn)))>>=(\q-> 
@@ -396,9 +399,9 @@ obsHat = 2.7e-4
                ((gpByChol dt) 
                           (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 
                           cholm))))))))
-  where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOU thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
+  where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOUOld thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
         soffset = ntrials / 2
-        sslope = 8.000e-3 * (1000/ntrials) -}
+        sslope = 8.000e-3 * (1000/ntrials) 
 
 quantalEvent t = simq*(((((step (t-simt0))*170)*170)*(t-simt0))*(exp ((0.000-(t-simt0))*170)))
 stagger (i, Signal dt t0 sig) = Signal dt i sig

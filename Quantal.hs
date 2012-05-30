@@ -251,7 +251,7 @@ measNoise npars sess = runRIO $ do
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let sigs = take 10 sigs'
       initparv = if npars ==1 then [-5] else [2::Double, -2, -6, -10]
-      initialV = L.join $ map L.fromList [ take npars initparv, map sigAv sigs]    
+      initialV = L.join $ map L.fromList [ take npars initparv, [sigAv $ head sigs]]    
   
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
@@ -261,8 +261,8 @@ measNoise npars sess = runRIO $ do
   --io $ print $ posteriorNoiseV sigs initial1
   --io $ print $ posteriorNoiseV sigs initial2
   --fail "foo" 
-  let fixed = [((i,j),0) | i <- [npars..10+npars], j <- [npars..10+npars], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 10, 
+  let fixed = [] -- [((i,j),0) | i <- [npars..1+npars], j <- [npars..1+npars], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 10, verboseNM = True,
                                                         initw = (\n -> if n<=npars-1 then 0.02 else 0.1)} 
                                              (posteriorNoiseV npars sigs) [] fixed initialV
   io $ print laout
@@ -273,17 +273,17 @@ measNoise npars sess = runRIO $ do
                          sample $ initialAdaMet 200 (\n -> if n<=npars-1 then 5e-4 else 1e-3)  (posteriorNoiseV npars sigs) init2
                  else do io $ print "starting from existing cov"
                          sample $ initialAdaMetFromCov 400 (posteriorNoiseV npars sigs) init2 
-                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
+                                                                    (L.scale (0.4) (PDF.posdefify $ fromJust mbcor)) 
  --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 
 
   io$ print $ iniampar
   --let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
 
-  froampar <- runAndDiscard 1500 (show . ampPar) iniampar $ adaMet False (posteriorNoiseV npars sigs)
+  --froampar <- runAndDiscard 1500 (show . ampPar) iniampar $ adaMet False (posteriorNoiseV npars sigs)
+ 
+  --io$ print $ froampar
 
-  io$ print $ froampar
-
-  vsamples <- runAdaMetRIO 5000 True (froampar) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 5000 False (iniampar) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
@@ -292,6 +292,7 @@ measNoise npars sess = runRIO $ do
   io $ writeFile (take 6 sess++"/noisePars"++show npars) $ show vsmn 
   io $ writeFile (take 6 sess++"/noise_samples"++show npars) $ show vsamples
   return ()
+
 
 
 notKosher (Nothing) = True
