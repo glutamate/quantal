@@ -63,14 +63,14 @@ main = do
 
   --plotIt "autoCorrAv" $ [avSigs $ map autoCorrSig $ sigs] 
 
-  vsamples::[L.Vector Double] <- fmap (read) $ readFile (take 6 sess++"/noise_samples")
+  vsamples::[L.Vector Double] <- fmap (read) $ readFile (take 6 sess++"/noise_samples3")
 
   --plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
   --plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
   --plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
 
-  let thetahist =   Histo 50 $ map ( (@>0)) vsamples
-  let sigmahist =   Histo 50 $ map (@>1) vsamples
+  let thetahist =   Histo 50 $ map ( (@>1)) vsamples
+  let sigmahist =   Histo 50 $ map (@>0) vsamples
   let obshist = Histo 50 $ map  ( (@>2)) vsamples
   let flathist = Histo 50 $ map  ( (@>3)) vsamples
 
@@ -99,28 +99,34 @@ main = do
              vsample <- fmap ( L.toList ) $ sample $ oneOf vsamples'
              let vsample1 = if npars == 4 then take 2 vsample ++ [(vsample!!2)-2, vsample!!3] else vsample
              let cholm = L.chol $ mkCovM (np+1) $ take npars $ vsample1
-             sample $ sequence $ replicate 10 $ gpByChol dt (\t-> 0) cholm
+             sample $ sequence $ replicate 10 $ fmap (baselineSig 0.1) $ gpByChol dt (\t-> 0) cholm
     
 
-  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 4 $ do
-                         sigs <-  mkFakeSigs npars fnm 
-                         return $ avSigs $ map autoCorrSig $ sigs
-
-  let mkAutoCorrPlot fake = ( Lines [LineWidth 1, LineType 1, LineColor "red"]fake ) :+: Lines [LineWidth 5, LineType 1, LineColor "black"] [avSigs $ map autoCorrSig $ sigs] 
+  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 20 $ do
+                         sigs <-  mkFakeSigs npars fnm                          
+                         return (avSigs $ map autoCorrSig $ sigs, map sigSpan sigs) 
 
 
-  fakesigs3 <- runRIO $ mkFakeSigs 4 (take 6 sess++"/noise_samples")
-  fakeautocorr3 <- mkFakeAutoCorr 4 (take 6 sess++"/noise_samples")
 
-  fakesigs2 <- runRIO $  mkFakeSigs 3 (take 6 sess++"/noise_samples2")
-  fakeautocorr2 <- mkFakeAutoCorr 3 (take 6 sess++"/noise_samples2")
+  let mkAutoCorrPlot fake = ( Lines [LineWidth 1, LineType 1, LineColor "red"] $ map fst fake ) :+: Lines [LineWidth 5, LineType 1, LineColor "black"] [avSigs $ map autoCorrSig $ sigs] 
 
-  fakesigs1 <- runRIO $  mkFakeSigs 2 (take 6 sess++"/noise_samples1")
-  fakeautocorr1 <- mkFakeAutoCorr 2 (take 6 sess++"/noise_samples1")
+
+  fakesigs4 <- runRIO $ mkFakeSigs 4 (take 6 sess++"/noise_samples4")
+  fakeautocorr4 <- mkFakeAutoCorr 4 (take 6 sess++"/noise_samples4")
+
+  fakesigs3 <- runRIO $  mkFakeSigs 3 (take 6 sess++"/noise_samples3")
+  fakeautocorr3 <- mkFakeAutoCorr 3 (take 6 sess++"/noise_samples3")
+
+  fakesigs2 <- runRIO $  mkFakeSigs 2 (take 6 sess++"/noise_samples2")
+  fakeautocorr2 <- mkFakeAutoCorr 2 (take 6 sess++"/noise_samples2")
+
+  fakesigs1 <- runRIO $  mkFakeSigs 1 (take 6 sess++"/noise_samples1")
+  fakeautocorr1 <- mkFakeAutoCorr 1 (take 6 sess++"/noise_samples1")
 
   plotIt "plotr" $ realNoise :||: Noplot
 
 
+  plotIt "plot4" $ fakesigs4 :||: mkAutoCorrPlot fakeautocorr4
   plotIt "plot3" $ fakesigs3 :||: mkAutoCorrPlot fakeautocorr3
   plotIt "plot2" $ fakesigs2  :||: mkAutoCorrPlot fakeautocorr2
   plotIt "plot1" $ fakesigs1 :||: mkAutoCorrPlot fakeautocorr1
@@ -131,17 +137,31 @@ main = do
   plotIt "fig2" $ (plot3v  (C $ mkAutoCorrPlot fakeautocorr3) (Aii fakesigs1) (Ai realNoise)) 
                    :||: (B $ plot3v ("theta", thetahist) ("sigma", sigmahist) ("observation", obshist))
 
-  plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (exp . (@>0)) vsamples)
-  plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>1) vsamples)
-  plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (exp . (@>2)) vsamples)
+  plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>0) vsamples)
+  plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (@>1) vsamples)
+  plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (@>2) vsamples)
   plotIt "flat" $ ("flat", zip [(0::Double)..] $ map  (exp . (@>3)) vsamples)
 
+  puts $ "sigspan real = "++ show (runStat meanF $ map sigSpan realNoise) ++"\n\n"
+  puts $ "sigspan model1 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr1) ++"\n\n"
+  puts $ "sigspan model2 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr2) ++"\n\n"
+  puts $ "sigspan model3 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr3) ++"\n\n"
+  puts $ "sigspan model4 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr4) ++"\n\n"
+
+  plotIt "spanhists" $ ("1", Histo 10 (map (runStat meanF . snd) fakeautocorr1)) :+:
+                       ("2", Histo 10 (map (runStat meanF . snd) fakeautocorr2)) :+:
+                       ("3", Histo 10 (map (runStat meanF . snd) fakeautocorr3)) :+:
+                       ("4", Histo 10 (map (runStat meanF . snd) fakeautocorr4)) 
 
   puts "\\end{document}"
   hClose h
 
   system $ "pdflatex Figure2.tex"
   return ()
+
+sigSpan :: Signal Double -> Double
+sigSpan (Signal dt t0 vec) = let (lo,hi) = runStat (both minF maxF) $ L.toList vec
+                             in hi - lo
 
 autoCorrSig :: Signal Double -> Signal Double
 autoCorrSig (Signal dt t0 vec) = Signal dt t0 $ L.fromList $ autoCorr $ L.toList vec

@@ -49,10 +49,10 @@ main = do
   createDirectoryIfMissing False $ take 6 sess
 
   when ('1' `elem` dowhat) $ epspSigs sess
-  when ('2' `elem` dowhat) $ measNoise3 sess
+  when ('2' `elem` dowhat) $ measNoise 4 sess
 
   when ('6' `elem` dowhat) $ simulate sess rest
-  when ('3' `elem` dowhat) $ measAmps sess
+  when ('3' `elem` dowhat) $ measAmps 4 sess
   when ('4' `elem` dowhat) $ measNPQ sess
 --  when ('5' `elem` dowhat) $ summary sess
 
@@ -62,20 +62,28 @@ main = do
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
  
   when ('t' `elem` dowhat) $ testCovM sess
-  when ('a' `elem` dowhat) $ measNoise1 sess
-  when ('b' `elem` dowhat) $ measNoise2 sess
+  when ('a' `elem` dowhat) $ measNoise 3 sess
+  when ('b' `elem` dowhat) $ measNoise 2 sess
+  when ('c' `elem` dowhat) $ measNoise 1 sess
+  when ('d' `elem` dowhat) $ measAmps 1 sess
+  when ('e' `elem` dowhat) $ measAmps 3 sess
+  when ('f' `elem` dowhat) $ measAmps 2 sess
 
   return ()
 
 
 testCovM sess = runRIO $ do
+  let npars = 1
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let initialV = L.join $ map L.fromList [ [-2, 2::Double, -6, -9], replicate 10 (-60)] 
+  let initialV = L.join $ map L.fromList [ take npars [ -5::Double, -2, -6, -9], replicate 10 (-60)] 
       sigs = take 10 sigs'
+      var1 = runStat varF $ L.toList $ snd $ observe $ head sigs
+  io$ print $ var1
+  io $ print $ exp (-5)
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
   io $ print $ L.dim sigpts
-  io $ print $ posteriorNoiseV3 sigs initialV
+  io $ print $ posteriorNoiseV npars sigs initialV
 
   {-let covM = mkCovM np (-2) (2::Double) (-6) (-9)
       row1 = L.toList $ head $ L.toRows $ fst covM
@@ -239,122 +247,67 @@ epspSigs sess = do
      return $ Just sessionIdentifier
   writeFile (take 6 sess++"/sessions") $ show nms
 
-measNoise3 sess = runRIO $ do 
+measNoise npars sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let sigs = take 10 sigs'
-      initialV = L.join $ map L.fromList [ [2::Double, -2, -6, -10], map sigAv sigs]    
+      initparv = if npars ==1 then [-5] else [2::Double, -2, -6, -10]
+      initialV = L.join $ map L.fromList [ take npars initparv, map sigAv sigs]    
   
   io$ print $ tmax/dt
   let sigpts = snd $ observe $ head sigs
   io $ print $ L.dim sigpts
   io $ print initialV
-  io $ print $ posteriorNoiseV3 sigs initialV
+  io $ print $ posteriorNoiseV npars sigs initialV
   --io $ print $ posteriorNoiseV sigs initial1
   --io $ print $ posteriorNoiseV sigs initial2
   --fail "foo" 
-  let fixed = [((i,j),0) | i <- [4..14], j <- [4..14], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
-                                                        initw = (\n -> if n<=3 then 0.02 else 0.1)} 
-                                             (posteriorNoiseV3 sigs) [] fixed initialV
+  let fixed = [((i,j),0) | i <- [npars..10+npars], j <- [npars..10+npars], i/=j]
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 10, 
+                                                        initw = (\n -> if n<=npars-1 then 0.02 else 0.1)} 
+                                             (posteriorNoiseV npars sigs) [] fixed initialV
   io $ print laout
-  let pdf0 = posteriorNoiseV3 sigs init2
+  let pdf0 = posteriorNoiseV npars sigs init2
   io $ print $ pdf0
-  {-iniampar <- if (not $ isJust mbcor) 
-                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV3 sigs) init2
-                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV3 sigs) init2 
+  iniampar <- if notKosher mbcor
+                 then do io $ print "starting from fresh"
+                         sample $ initialAdaMet 200 (\n -> if n<=npars-1 then 5e-4 else 1e-3)  (posteriorNoiseV npars sigs) init2
+                 else do io $ print "starting from existing cov"
+                         sample $ initialAdaMetFromCov 400 (posteriorNoiseV npars sigs) init2 
                                                                     (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
- --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 -}
+ --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 
 
-  --io$ print $ iniampar
-  let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
-  vsamples <- runAdaMetRIO 6000 True (iniampar) (posteriorNoiseV3 sigs) 
-  let [sigma, logtheta, logobs, logsmooth] = L.toList$ L.subVector 0 4 $ runStat meanF vsamples
-  io $ writeFile (take 6 sess++"/noisePars") $ show (sigma, logtheta, logobs, logsmooth)
-  io $ writeFile (take 6 sess++"/noise_samples") $ show vsamples
-  return ()
+  io$ print $ iniampar
+  --let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
 
-measNoise2 sess = runRIO $ do 
-  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let sigs = take 10 sigs'
-      initialV = L.join $ map L.fromList [ [2::Double, -2, -6], map sigAv sigs]    
-  
-  io$ print $ tmax/dt
-  let sigpts = snd $ observe $ head sigs
-  io $ print $ L.dim sigpts
-  io $ print initialV
-  io $ print $ posteriorNoiseV2 sigs initialV
-  --io $ print $ posteriorNoiseV sigs initial1
-  --io $ print $ posteriorNoiseV sigs initial2
-  --fail "foo" 
-  let fixed = [((i,j),0) | i <- [3..13], j <- [3..13], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
-                                                        initw = (\n -> if n<=2 then 0.02 else 0.1)} 
-                                             (posteriorNoiseV2 sigs) [] fixed initialV
-  io $ print laout
-  let pdf0 = posteriorNoiseV2 sigs init2
-  io $ print $ pdf0
-  {-iniampar <- if (not $ isJust mbcor) 
-                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV2 sigs) init2
-                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV2 sigs) init2 
-                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
- --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 -}
+  froampar <- runAndDiscard 1500 (show . ampPar) iniampar $ adaMet False (posteriorNoiseV npars sigs)
 
-  --io$ print $ iniampar 
-  let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
-  vsamples <- runAdaMetRIO 6000 True (iniampar) (posteriorNoiseV2 sigs) 
-  let [logtheta, sigma, logobs] = L.toList$ L.subVector 0 3 $ runStat meanF vsamples
-  io $ writeFile (take 6 sess++"/noisePars2") $ show (logtheta, sigma, logobs)
-  io $ writeFile (take 6 sess++"/noise_samples2") $ show vsamples
-  return ()
+  io$ print $ froampar
 
-measNoise1 sess = runRIO $ do 
-  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let sigs = take 10 sigs'
-      initialV = L.join $ map L.fromList [ [2::Double, -2], map sigAv sigs]    
-  
-  io$ print $ tmax/dt
-  let sigpts = snd $ observe $ head sigs
-  io $ print $ L.dim sigpts
-  io $ print initialV
-  io $ print $ posteriorNoiseV1 sigs initialV
-  --io $ print $ posteriorNoiseV sigs initial1
-  --io $ print $ posteriorNoiseV sigs initial2
-  --fail "foo" 
-  let fixed = [((i,j),0) | i <- [2..12], j <- [2..12], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 5, 
-                                                        initw = (\n -> if n<=1 then 0.02 else 0.1)} 
-                                             (posteriorNoiseV1 sigs) [] fixed initialV
-  io $ print laout
-  let pdf0 = posteriorNoiseV1 sigs init2
-  io $ print $ pdf0
-  {-iniampar <- if (not $ isJust mbcor) 
-                 then sample $ initialAdaMet 200 (\n -> if n<=3 then 5e-6 else 1e-3)  (posteriorNoiseV1 sigs) init2
-                 else sample $ initialAdaMetFromCov 400 (posteriorNoiseV1 sigs) init2 
-                                                                    (L.scale (1.0) (PDF.posdefify $ fromJust mbcor)) 
- --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 -}
-
-  --io$ print $ iniampar
-  let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
-  vsamples <- runAdaMetRIO 6000 True (iniampar) (posteriorNoiseV1 sigs) 
-  let [logtheta, sigma] = L.toList$ L.subVector 0 2 $ runStat meanF vsamples
-  io $ writeFile (take 6 sess++"/noisePars1") $ show (logtheta, sigma)
-  io $ writeFile (take 6 sess++"/noise_samples1") $ show vsamples
+  vsamples <- runAdaMetRIO 5000 True (froampar) (posteriorNoiseV npars sigs) 
+  let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
+{-      vsamTup = case vsmn of 
+                   [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
+                   [sigma, logtheta, logobs] -> show (sigma, logtheta, logobs)
+                   [sigma, logtheta] -> show (sigma, logtheta) -}
+  io $ writeFile (take 6 sess++"/noisePars"++show npars) $ show vsmn 
+  io $ writeFile (take 6 sess++"/noise_samples"++show npars) $ show vsamples
   return ()
 
 
+notKosher (Nothing) = True
+notKosher (Just mat) = any (nanOrInf) $ L.toList $ L.flatten mat
 
-measAmps sess = runRIO $ do
-  (logtheta, sigma, logobs) <- fmap read $ io $ readFile (take 6 sess++"/noisePars")
-  let covM = fillM (np,np) $
-              \(i,j)-> ((covOU (exp logtheta) (sigma::Double)) (toD i)) (toD j)+ifObs i j (exp logobs)
-  let invDetails = invlndet covM
+measAmps npars sess = runRIO $ do
+  noisepars <- fmap read $ io $ readFile (take 6 sess++"/noisePars"++show npars)
+  let covM = mkCovM np noisepars 
+  let invDetails = invlndetC covM
   {-nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
   sigs <- fmap concat $ forM nms $ \sessNm-> do 
             LoadSignals sigs <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
             return sigs
   let wf = baselineSig 0.003 $ averageSigs $ sigs -}
   (wf, _, sigs) <- io $ getWf sess
-  h<- io $ openFile (take 6 sess++"/epsps") WriteMode 
+  h<- io $ openFile (take 6 sess++"/epsps"++show npars) WriteMode 
   forM_ sigs $ \sig@(Signal dt t0 _) -> do
       let initialV = L.fromList [-60,1]
       case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV wf invDetails sig) [] [] initialV of

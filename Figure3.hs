@@ -36,7 +36,8 @@ import Graphics.Gnewplot.Histogram
 import Control.Monad.Trans
 
 main = do
-  let sess = "57246a"
+  --let sess = "57246a"
+  let sess = "00c9bd"
   h <- openFile ("Figure3.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -86,17 +87,26 @@ main = do
   --plotIt ("epsps_"++ take 6 sess) $ measPts
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
-  let tsamps = zip t0s' $ map (*wfAmp) amps
+
+  let ampsFromFile npars = do
+        (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps"++show npars)
+        let tsamps = zip t0s' $ map (*wfAmp) amps
+        return tsamps
+
+  tsamps1 <- ampsFromFile 1
+  tsamps2 <- ampsFromFile 2
+  tsamps3 <- ampsFromFile 3
 
   let rngIt x = Points [PointType 7] $ XRange 10 5800 $ YRange (-0.6) 1.6 x
 
-  plotIt "pcurve" $ (YLabel "EPSP amplitude (mV)" $ rngIt measPts) :||: (YTics [] $ rngIt tsamps)
+  plotIt "pcurve1" $ (YLabel "EPSP amplitude (mV)" $ rngIt measPts) :||: (YTics [] $ rngIt tsamps1)
+  plotIt "pcurve2" $ (YLabel "EPSP amplitude (mV)" $ rngIt tsamps2) :||: (YTics [] $ rngIt tsamps3)
+
  
-  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
+--  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
   --puts $ "failNew = "++show failNewT
 
-  let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts 
+--  let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts 
   --puts $ "failOld = "++show failOldT
 
 
@@ -117,13 +127,19 @@ main = do
 
 --  puts $ show (var1, var2)
 
-  var12 <- forM datasess $ \sess1 -> do
-     (var1, var2) <- varDiff sess1
-     puts $ take 6 sess1++ "\t"++show var1++ "\t"++show var2
-     return (var1, var2)
+  var12 <- forM ["00c9bd"] $ \sess1 -> do
+     vars <- varDiff sess1
+     puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
+     return vars 
 
-  puts $ show $ map fst var12
-  puts $ show $ map snd var12
+  let vars = map (runStat meanF) $ transpose var12
+
+
+  puts $ show vars
+
+  plotIt "varplot" $ Boxes $ zip [(0::Double)..] vars
+  --puts $ show $ map fst var12
+  --puts $ show $ map snd var12
 
   puts "\\end{document}"
   hClose h
@@ -156,13 +172,17 @@ varDiff sess = do
   (wf, wfAmp, sigs) <- getWf sess
 
   let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
-  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
-  let tsamps = zip t0s' $ map (*wfAmp) amps
-  let var1 = runStat meanF $ map (localVar measPts) measPts
-  let var2 = runStat meanF $ map (localVar tsamps) tsamps
+  let varTrad = runStat meanF $ map (localVar measPts) measPts
 
-  return (var1, var2)
+  vars <- forM [1..4] $ \npars -> do
+     let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+     ex <- doesFileExist (sess++"/epsps"++show npars)
+     if ex
+        then do (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps"++show npars)
+                let tsamps = zip t0s' $ map (*wfAmp) amps
+                return $ runStat meanF $ map (localVar tsamps) tsamps
+        else return 0
+  return $ varTrad : vars
 
 
 
