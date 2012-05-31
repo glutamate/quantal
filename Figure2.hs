@@ -99,7 +99,7 @@ main = do
              vsample <- fmap ( L.toList ) $ sample $ oneOf vsamples'
              let vsample1 = if npars == 4 then take 2 vsample ++ [(vsample!!2)-2, vsample!!3] else vsample
              let cholm = L.chol $ mkCovM (np+1) $ take npars $ vsample1
-             sample $ sequence $ replicate 10 $ fmap (baselineSig 0.1) $ gpByChol dt (\t-> 0) cholm
+             sample $ sequence $ replicate 10 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
     
 
   let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 20 $ do

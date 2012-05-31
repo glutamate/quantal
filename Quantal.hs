@@ -68,14 +68,27 @@ main = do
   when ('d' `elem` dowhat) $ measAmps 1 sess
   when ('e' `elem` dowhat) $ measAmps 3 sess
   when ('f' `elem` dowhat) $ measAmps 2 sess
+  when ('z' `elem` dowhat) $ measAll sess
 
   return ()
 
 
+measAll sess = do 
+--  system $ "~/.cabal/bin/quantal "++sess++" 1"
+  system $ "~/.cabal/bin/quantal "++sess++" a"
+  system $ "~/.cabal/bin/quantal "++sess++" b"
+  system $ "~/.cabal/bin/quantal "++sess++" c"
+  system $ "~/.cabal/bin/quantal "++sess++" 2"
+  system $ "~/.cabal/bin/quantal "++sess++" d"
+  system $ "~/.cabal/bin/quantal "++sess++" e"
+  system $ "~/.cabal/bin/quantal "++sess++" f"
+  system $ "~/.cabal/bin/quantal "++sess++" 3"
+  return ()
+
 testCovM sess = runRIO $ do
-  let npars = 1
+  let npars = 4
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
-  let initialV = L.join $ map L.fromList [ take npars [ -5::Double, -2, -6, -9], replicate 10 (-60)] 
+  let initialV = L.join $ map L.fromList [ take npars [ 2::Double, -2, -6, -9], [-60]] 
       sigs = take 10 sigs'
       var1 = runStat varF $ L.toList $ snd $ observe $ head sigs
   io$ print $ var1
@@ -117,111 +130,7 @@ simulate sess rest = runRIO $ do
   io $ writeFile (take 6 sess++"/sessions") $ show [sess]
  
 
-{-summary sess = do
-  changeWorkingDirectory $ take 6 sess
-  h <- openFile (take 6 sess++".tex") WriteMode 
-  let puts = hPutStrLn h
-      plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
-                         system $ "epstopdf "++nm++".eps"
-                         puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
-  measss <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
-     rebaseRelativeTo sess
-     vm <- signalsDirect "vm"
-     sessionIdentifier <- getSessionName
-     sessionStart <- getSessionStart
-     spike <- events "spike" ()
-     running <- durations "running" ()
-     exclude <- durations "exclude" ()
-     let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
-     let noGood = contains ((>3)//swings) running
-     let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
-     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
-     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
-     let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
-     let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
-     let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
-     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
-     return $ Just (measDur, swings)
-  puts $ unlines     ["\\documentclass[11pt]{article}",
-     "%include lhs2TeX.fmt",
-     "%include polycode.fmt",
-     "\\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}",
-     "\\usepackage{graphicx}",
-     "\\begin{document}",
-     sess,
-     "\n\ntraditionally measured EPSP amplitudes\n\n"]
- 
-  let meass = map fst measss
 
-  plotIt ("epsps_"++ take 6 sess) $ ((durStart $ concat meass) :: [(Double,Double)])
-
-  plotIt ("swings_"++ take 6 sess) $  concat $ map snd measss
-
-  
-
-  plotIt ("swinghists_"++ take 6 sess) $ Histo 400 $ filter (<3) $ map snd $ concat $ map snd measss
-
-
-  (wf, wfAmp, sigs) <- getWf' sess
-
-  putStrLn $ "nwfpts="++show (sigNpts wf)
-
-  puts $ "wfamp= "++show wfAmp++"\n"
-  plotIt "wf" wf
-  print wfAmp
-
-
-  plotIt "slopeHisto" $ Histo 100 $ map sigSlope sigs 
-
-
-  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps::[Double],sds::[Double]) <- fmap ffile  $ readFile ("epsps")
-  plotIt ("epspsou_"++ take 6 sess) $ Points [PointSize 1] $ zip t0s' $ map (*wfAmp) amps
-
-  puts $ "wfamp= "++show wfAmp++"\n"
-  puts $ "\nnsigs= "++show (length sigs)++"\n"
-  plotIt "wf" $ wf 
-
-  plotIt "wfs" $ take 10 sigs -- ++ (take 10 $ reverse sigs)
-
-  --plotIt "first10" $ take 3 sigs 
-
-
-
-
-  noisePars <- readFile ("noisePars")
-  puts $ "\nnoisePars = "++noisePars++"\n"
-
-  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps,sds::[Double]) <-  fmap ffile  $ readFile ("epsps")
-  let tsamps = zip t0s' amps
-      --tsamps = filter ((<3) . (\(t, amp)-> zscore tsamps' (t,amp))) tsamps'
-      t0s = map fst tsamps
-  let weighCurve' = map (weighRegression tsamps ) t0s
-      maxPcurve = foldl1 max weighCurve'
-      pcurve = map (/(maxPcurve)) weighCurve'
-  let globalSd = sqrt $ runStat (before meanF (**2)) sds
-
-  puts $ "\nglobalSd  = "++show globalSd++"\n"
-
-  plotIt "pcurve" $ zip t0s pcurve :+: tsamps
-
-  vsamples::[L.Vector Double] <- fmap read $ readFile ("npq_samples")
-  let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
-  puts $ intercalate "\t" $ map (minWidth 8) $ words "n cv phi q"
-  puts $ "\n"++showNPQV mean++"\n"
-  puts $ showNPQV sd ++"\n"
-
-  puts "\n"
-  
-  plotIt "nplot" $ zip [(0::Double)..] $ map (@>0) vsamples
-
-  puts "\\end{document}"
-  hClose h
-
-  system $ "pdflatex "++take 6 sess++".tex"
-  return ()
--}
 epspSigs sess = do 
   nms <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
      rebaseRelativeTo sess
@@ -262,8 +171,8 @@ measNoise npars sess = runRIO $ do
   --io $ print $ posteriorNoiseV sigs initial2
   --fail "foo" 
   let fixed = [] -- [((i,j),0) | i <- [npars..1+npars], j <- [npars..1+npars], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 10, verboseNM = True,
-                                                        initw = (\n -> if n<=npars-1 then 0.02 else 0.1)} 
+  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 1, verboseNM = True,
+                                                        initw = (\n -> if n<=npars-1 then 0.02 else 0.02)} 
                                              (posteriorNoiseV npars sigs) [] fixed initialV
   io $ print laout
   let pdf0 = posteriorNoiseV npars sigs init2
@@ -271,19 +180,18 @@ measNoise npars sess = runRIO $ do
   iniampar <- if notKosher mbcor
                  then do io $ print "starting from fresh"
                          sample $ initialAdaMet 200 (\n -> if n<=npars-1 then 5e-4 else 1e-3)  (posteriorNoiseV npars sigs) init2
-                 else do io $ print "starting from existing cov"
-                         sample $ initialAdaMetFromCov 400 (posteriorNoiseV npars sigs) init2 
-                                                                    (L.scale (0.4) (PDF.posdefify $ fromJust mbcor)) 
+                 else  initAdaMetFromCov (posteriorNoiseV npars sigs) init2 0
+                                                                    (fromJust mbcor) 
  --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 
 
-  io$ print $ iniampar
+  --io$ print $ iniampar
   --let iniampar = AMPar init2 init2 (fromJust mbcor) 2.4 (pdf0) 0 0
 
   --froampar <- runAndDiscard 1500 (show . ampPar) iniampar $ adaMet False (posteriorNoiseV npars sigs)
  
   --io$ print $ froampar
 
-  vsamples <- runAdaMetRIO 5000 False (iniampar) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 30000 False (iniampar) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
@@ -311,7 +219,7 @@ measAmps npars sess = runRIO $ do
   h<- io $ openFile (take 6 sess++"/epsps"++show npars) WriteMode 
   forM_ sigs $ \sig@(Signal dt t0 _) -> do
       let initialV = L.fromList [-60,1]
-      case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV wf invDetails sig) [] [] initialV of
+      case laplaceApprox defaultAM {nmTol = 0.001} (posteriorSigV wf invDetails sig) [] [] initialV of
 
          (v, Just cor, smplx) -> do
                 let amp = v @> 1

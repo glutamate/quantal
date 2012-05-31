@@ -238,6 +238,21 @@ baselineSigFrom tfrom tbase (Signal dt tst vec) =
    in (Signal dt tst (L.mapVector (subtract xsub) vec))
 
 
+
+initAdaMetFromCov pdf initv retries cov = do
+  io $ putStrLn $ "starting from existing cov; try number "++ show retries
+  iniampar <- sample $ initialAdaMetFromCov 400 (pdf) initv
+                                                (PDF.posdefify $ cov) 
+  io $ print iniampar
+  case () of
+     _ | retries > 4 -> do io $ putStrLn "initals ok." 
+                           return iniampar
+     _ | count_accept iniampar > 160 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 2 cov 
+     _ | count_accept iniampar < 60 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.3 cov 
+  
+
+-- 
+
 posteriorSigV wf invDetails sig v 
   = ouSynapseLogPdf invDetails (scaleSig (v0) amp wf) sig
  where v0 = v@> 0
@@ -459,7 +474,7 @@ getSess def = do
 
 datasess = 
  --words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
- words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 fcb952 b34863 cf96ab" -- fcb952 b62b8f
+ words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 fcb952 b34863 cf96ab b62b8f"  -- fcb952 b62b8f
 
 burnIn = [("22b", 8000), ("b62", 6000), ("cf96", 4000), 
           ("b34", 3000), ("00c9",10000), ("84", 15000), ("572", 13000)]
