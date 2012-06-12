@@ -245,10 +245,16 @@ initAdaMetFromCov pdf initv retries cov = do
                                                 (PDF.posdefify $ cov) 
   io $ print iniampar
   case () of
-     _ | retries > 4 -> do io $ putStrLn "initals ok." 
+     _ | retries > 5 -> do io $ putStrLn "initals ok." 
                            return iniampar
-     _ | count_accept iniampar > 160 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 2 cov 
+     _ | count_accept iniampar > 200 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 2 cov 
+     _ | count_accept iniampar > 150 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 1.5 cov 
+     _ | count_accept iniampar < 30 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.2 cov 
      _ | count_accept iniampar < 60 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.3 cov 
+     _ | count_accept iniampar < 80 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.5 cov 
+     _ | count_accept iniampar < 90 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.8 cov 
+     _ | otherwise -> do io $ putStrLn "initals ok." 
+                         return iniampar
   
 
 -- 

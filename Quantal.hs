@@ -191,7 +191,7 @@ measNoise npars sess = runRIO $ do
  
   --io$ print $ froampar
 
-  vsamples <- runAdaMetRIO 30000 False (iniampar) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 30000 True (iniampar) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
