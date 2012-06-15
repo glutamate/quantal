@@ -70,6 +70,8 @@ main = do
   when ('f' `elem` dowhat) $ measAmps 2 sess
   when ('z' `elem` dowhat) $ measAll sess
 
+  when ('y' `elem` dowhat) $ simulate4 sess rest
+
   return ()
 
 
@@ -121,14 +123,25 @@ simulateAll nss ntrs = do
        system $ "./Quantal "++sessnm++" 34"
 
 
+simulate4 sess nstart  = 
+  forM_ [0..3] $ \i -> do
+    simulate (sess++show (i+read ( head nstart))) ["50", "1000"]
+  
+
 simulate sess rest = runRIO $ do
   let n = read $ rest!!0
   let ntrials = read $ rest!!1
+  io $ createDirectoryIfMissing False $ take 6 sess
   sigs <- fmap ( map stagger . zip [1..] ) $ sample $ fakesam n ntrials
   io $ encodeFile (take 6 sess++"/sigs_"++take 6 sess++"_epsps") $ LoadSignals sigs 
-  io $ writeFile (take 6 sess++"/noisePars") $ show (log thetaHat, sigmaHat, log obsHat)
+  io $ writeFile (take 6 sess++"/noisePars3") $ show hatPars
   io $ writeFile (take 6 sess++"/sessions") $ show [sess]
- 
+  io $ system $ "~/.cabal/bin/quantal "++sess++" e"
+  io $ system $ "~/.cabal/bin/quantal "++sess++" 4"
+  return ()
+
+
+
 
 
 epspSigs sess = do 
@@ -171,17 +184,18 @@ measNoise npars sess = runRIO $ do
   --io $ print $ posteriorNoiseV sigs initial2
   --fail "foo" 
   let fixed = [] -- [((i,j),0) | i <- [npars..1+npars], j <- [npars..1+npars], i/=j]
-  let laout@(init2,mbcor,_)  = laplaceApprox defaultAM {nmTol = 1, verboseNM = True,
+  laout@(init2,mbcor,_) <- io $ cacheIn (take 6 sess++"/laplaceNoise"++show npars) $ return $ laplaceApprox defaultAM {nmTol = 1, verboseNM = True,
                                                         initw = (\n -> if n<=npars-1 then 0.02 else 0.02)} 
                                              (posteriorNoiseV npars sigs) [] fixed initialV
   io $ print laout
+--  io $ writeFile (take 6 sess++"/noiseLaplace"++show npars) $ show (init2, mbcor)
   let pdf0 = posteriorNoiseV npars sigs init2
   io $ print $ pdf0
   iniampar <- if notKosher mbcor
                  then do io $ print "starting from fresh"
                          sample $ initialAdaMet 200 (\n -> if n<=npars-1 then 5e-4 else 1e-3)  (posteriorNoiseV npars sigs) init2
-                 else  initAdaMetFromCov (posteriorNoiseV npars sigs) init2 0
-                                                                    (fromJust mbcor) 
+                 else  initAdaMetFromCov 400 (posteriorNoiseV npars sigs) init2 0
+                                                                          (fromJust mbcor) 
  --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 
 
   --io$ print $ iniampar
@@ -191,7 +205,7 @@ measNoise npars sess = runRIO $ do
  
   --io$ print $ froampar
 
-  vsamples <- runAdaMetRIO 30000 True (iniampar) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 5000 True (iniampar) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
@@ -264,7 +278,7 @@ measAmps npars sess = runRIO $ do
  
 measNPQ sess = runRIO $ do
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (take 6 sess++"/epsps")
+  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (take 6 sess++"/epsps3")
   let tsamps =  filter (getFilter sess) $ zip t0s' amps'
       --tsamps = filter ((<3) . (\(t, amp)-> zscore tsamps' (t,amp))) tsamps'
       t0s = map fst tsamps
@@ -298,102 +312,15 @@ measNPQ sess = runRIO $ do
   iniampar <- sample $ initialAdaMet 500 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
   io $ putStr "inipar ="
   io $ print $ iniampar 
-  {-topAll <- runAndDiscard nsam (showNPQV') iniampar $ adaMet False  (posteriorNPQV amps pcurve globalSd)
-  io $ putStr "topall ="
-  io $ print $ topAll 
 
-  let phiHat = ampPar topAll @> 1 -}
-
-  {-let topNP = AMPar (L.fromList [ampPar topAll @> 0, ampPar topAll @> 2])
-                    (L.fromList [ampPar topAll @> 0, ampPar topAll @> 2])
-                    (((L.><) 2 2) [ampCov topAll L.@@> (0,0), ampCov topAll L.@@> (2,0), 
-                                   ampCov topAll L.@@> (0,2), ampCov topAll L.@@> (2,2)])
-                    1
-                    10 5
-  let topQCV= AMPar (L.fromList [ampPar topAll @> 1, ampPar topAll @> 3])
-                    (L.fromList [ampPar topAll @> 1, ampPar topAll @> 3])
-                    (((L.><) 2 2) [ampCov topAll L.@@> (1,1), ampCov topAll L.@@> (3,1), 
-                                   ampCov topAll L.@@> (1,3), ampCov topAll L.@@> (3,3)])
-                    1
-                    10 5
-
-  io $ putStr "topnp ="
-  io $ print $ topNP 
-
-  io $ putStr "topqcv ="
-  io $ print $ topQCV -}
-
-
-{-  inilooppars <- forM (zip amps pcurve) $ \(ampMean, pcurveVal) -> do
-        sample $ initialAdaMet 200 5e-3 
-                               (posteriorLoop' globalSd topAll  pcurveVal ampMean) 
-                               $ L.fromList [ ampMean ]
-                               
-  let schedule = zip (repeat 2000) [1] -- 300,200,150,100,75,50,30,20,15,10]
-
-  vsamples <- sample $ runGibbs' schedule
-                                 globalSd amps pcurve 
-                                 (shrink 10 topAll,  
-                                  map (reset_counts 10) inilooppars) []
-
-  io $ mapM_ print $ thin 10 vsamples
-
-  return () -}
-  
-{-    (maxPost,hess) = hessianFromSimplex' (negate . posteriorNPQV amps pcurve globalSd) [0] 
-                                      $ augmentSimplex maxN smplx 
-       
-  io $ putStr "fastNPQ ="
-  io $ print $ npq
-
-  io $ putStr "hess="
-  io $ print $ hess
-
-  io $ putStr "hess matrix eigen="
-  io $ print $ L.eigSH hess
-
-
-  io $ putStr "posdefify hess matrix: "
-  io $ print $ posdefify hess
-
-  io $ putStr "posdefified hess matrix eigen="
-  io $ print $ L.eigSH $ posdefify hess
-
-  let cor = posdefify $ setM 1 1 10 $ {-L.scale 1.5 $ -} L.inv $ posdefify hess -}
-
-
-
- {-io $ putStr " mean ="
-  io $ print $ maxFullV
-  io $ putStr "correlation matrix ="
-  io $ print $ cor -}
-
-
-    
-
-
-
-  {-(mnIL, covIL) <- sample $ iterLap [200,200, 500, 1000] (posteriorNPQV amps pcurve globalSd) (maxFullV, cor)
-
-  io $ putStr "improved correlation matrix ="
-  io $ print $ covIL
-
-  io $ putStr "improved mean ="
-  io $ print $ mnIL -}
-
-
-
-  --let ampar = AMPar maxFullV maxFullV cor (posteriorNPQV amps pcurve globalSd $maxFullV) 0 0
-  --vsamples <- runAdaMetRIO nsam True ampar $ posteriorNPQV amps pcurve globalSd   
---  iniampar <- sample $ initialAdaMetWithCov 500 (posteriorNPQV amps pcurve globalSd) cor maxFullV
---  io $ putStr "inipar ="
---  io $ print $ iniampar 
-  froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.1}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
+  froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.5}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
   io $ putStr "frozenpar ="
   io $ print $ froampar
   
+  iniampar1 <- initAdaMetFromCov 10000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
+                                                                            (ampCov froampar) 
 
-  vsamples <- runAdaMetRIO nsam True froampar (posteriorNPQV amps pcurve globalSd) 
+  vsamples <- runAdaMetRIO nsam True (iniampar {scaleFactor = 2.1}) (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 

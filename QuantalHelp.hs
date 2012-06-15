@@ -23,6 +23,8 @@ import "probably" Math.Probably.NelderMead
 import Data.List
 import System.Environment
 import Data.Array.IArray
+import System.Directory
+
 
 import Data.Binary
 
@@ -237,22 +239,31 @@ baselineSigFrom tfrom tbase (Signal dt tst vec) =
        xsub = (L.foldVector (+) 0 basevec) / realToFrac ntake      
    in (Signal dt tst (L.mapVector (subtract xsub) vec))
 
+cacheIn fnm mx = do
+  ex<- doesFileExist fnm
+  if ex 
+     then fmap read $ readFile fnm
+     else do x <- mx 
+             writeFile fnm $ show x
+             return x
 
 
-initAdaMetFromCov pdf initv retries cov = do
+initAdaMetFromCov nsam pdf initv retries cov = do
   io $ putStrLn $ "starting from existing cov; try number "++ show retries
-  iniampar <- sample $ initialAdaMetFromCov 400 (pdf) initv
-                                                (PDF.posdefify $ cov) 
+  iniampar <- sample $ initialAdaMetFromCov nsam (pdf) initv
+                                                 (PDF.posdefify $ cov) 
   io $ print iniampar
+  let rate = realToFrac (count_accept iniampar) / realToFrac nsam
   case () of
-     _ | retries > 5 -> do io $ putStrLn "initals ok." 
+     _ | retries > 8 -> do io $ putStrLn "initals ok." 
                            return iniampar
-     _ | count_accept iniampar > 200 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 2 cov 
-     _ | count_accept iniampar > 150 -> initAdaMetFromCov pdf initv (retries +1) $ L.scale 1.5 cov 
-     _ | count_accept iniampar < 30 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.2 cov 
-     _ | count_accept iniampar < 60 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.3 cov 
-     _ | count_accept iniampar < 80 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.5 cov 
-     _ | count_accept iniampar < 90 ->  initAdaMetFromCov pdf initv (retries +1) $ L.scale 0.8 cov 
+     _ | rate > 0.5 -> initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 2 cov 
+     _ | rate > 0.40 -> initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 1.5 cov 
+     _ | rate < 0.025 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.1 cov 
+     _ | rate < 0.075 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.2 cov 
+     _ | rate < 0.15 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.3 cov 
+     _ | rate < 0.19 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.5 cov 
+     _ | rate < 0.24 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.8 cov 
      _ | otherwise -> do io $ putStrLn "initals ok." 
                          return iniampar
   
@@ -385,8 +396,8 @@ localVar tsamps (t,amp) = sd*sd where
   z = (amp - (slope*t + offset))/ sd
  
 
-showNPQV' am = showNPQV (ampPar am)++" lh: "++show (lastLike am)
-
+showNPQV' am = showNPQV (ampPar am)++" lh: "++show (lastLike am) ++ " rate " ++ show rate
+  where rate = realToFrac (count_accept am) / realToFrac (count am)
 showNPQV :: L.Vector Double -> String
 showNPQV (L.toList -> [n, logcv, phi, logq]) 
   = intercalate "\t" $ map (minWidth 8 . accushow) [n, exp logcv, phi, exp logq]
@@ -403,10 +414,11 @@ simq = 4.000e-4
 simt0 = 0.035
 
 
-thetaHat = 0.15 --4.630e-3
+logthetaHat = 0.15 --4.630e-3
 sigmaHat = 1.6 --6.260
-obsHat = 2.7e-4
+logobsHat = 2.7e-4
 
+hatPars = [1.597389498633494,1.142442855327917,-8.1510424681037]
 
 fakesam simn ntrials = return 0.150>>=(\cv-> 
         (return 0.800)>>=(\phi-> 
@@ -420,7 +432,7 @@ fakesam simn ntrials = return 0.150>>=(\cv->
                ((gpByChol dt) 
                           (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 
                           cholm))))))))
-  where cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> covOUOld thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
+  where cholm = chol $ mkCovM (np+1) hatPars
         soffset = ntrials / 2
         sslope = 8.000e-3 * (1000/ntrials) 
 

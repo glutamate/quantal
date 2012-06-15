@@ -35,24 +35,17 @@ import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
 
-main = do
-  --let sess = "57246a"
-  let sess = "00c9bd"
-  h <- openFile ("Figure3.tex") WriteMode 
-  let puts s = hPutStrLn  h $ s ++ "\n"
-      plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
-                         system $ "epstopdf "++nm++".eps"
-                         puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
- 
-  puts $ unlines     ["\\documentclass[11pt]{article}",
-     "%include lhs2TeX.fmt",
-     "%include polycode.fmt",
-     "\\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}",
-     "\\usepackage{graphicx}",
-     "\\begin{document}",
-     "\n"]
 
-  meass <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
+
+
+{-measTrad sess = do
+  x<- doesFileExist (sess++"/tradAmps")
+  if x 
+     then fmap read $ readFile (sess++"/tradAmps")
+     else measTrad1 sess -}
+
+measTrad sess = do
+ cacheIn (sess++"/tradAmps") $ fmap catMaybes $ inEverySession $ whenContinues sess $ do
      rebaseRelativeTo sess
      vm <- signalsDirect "vm"
      sessionIdentifier <- getSessionName
@@ -72,6 +65,25 @@ main = do
      --lift $ print (sessionIdentifier, tpeak)
      lift $ print (sessionIdentifier, length spikeg, length measDur)
      return $ Just measDur
+
+main = do
+  --let sess = "57246a"
+  let sess = "22b152"
+  h <- openFile ("Figure3.tex") WriteMode 
+  let puts s = hPutStrLn  h $ s ++ "\n"
+      plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
+                         system $ "epstopdf "++nm++".eps"
+                         puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
+ 
+  puts $ unlines     ["\\documentclass[11pt]{article}",
+     "%include lhs2TeX.fmt",
+     "%include polycode.fmt",
+     "\\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}",
+     "\\usepackage{graphicx}",
+     "\\begin{document}",
+     "\n"]
+
+  meass <- measTrad sess 
 
   (wf, wfAmp, sigs) <- getWf sess
 
@@ -97,10 +109,10 @@ main = do
   tsamps2 <- ampsFromFile 2
   tsamps3 <- ampsFromFile 3
 
-  let rngIt x = Points [PointType 7] $ XRange 10 5800 $ YRange (-0.6) 1.6 x
+  let rngIt x = Points [PointType 7] $ XRange 10 4000 $ YRange (-0.3) 1.6 x
 
-  plotIt "pcurve1" $ (YLabel "EPSP amplitude (mV)" $ rngIt measPts) :||: (YTics [] $ rngIt tsamps1)
-  plotIt "pcurve2" $ (YLabel "EPSP amplitude (mV)" $ rngIt tsamps2) :||: (YTics [] $ rngIt tsamps3)
+  plotIt "pcurve1" $ (YLabel "Estimated amplitude (mV)" $ ("Window", rngIt measPts)) :||: (YTics [] $ ("Least squares", rngIt tsamps1))
+  plotIt "pcurve2" $ (YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (YTics [] $ ("OU + obs", rngIt tsamps3))
 
  
 --  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
@@ -127,17 +139,17 @@ main = do
 
 --  puts $ show (var1, var2)
 
-  var12 <- forM ["00c9bd"] $ \sess1 -> do
+  var12 <- forM datasess $ \sess1 -> do
      vars <- varDiff sess1
      puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
      return vars 
 
-  let vars = map (runStat meanF) $ transpose var12
+  let vars = map (runStat meanF) $ transpose $ filter allNonZero var12
 
 
   puts $ show vars
 
-  plotIt "varplot" $ Boxes $ zip [(0::Double)..] vars
+  plotIt "varplot" $ XTicLabel [("Window", 0), ("Least sq",1),("OU",2),("OU+obs",3),("OU+obs+flat",4)] $ YLabel "Variance" $ YRange 0 0.06 $ Boxes $ zip [(0::Double)..] vars
   --puts $ show $ map fst var12
   --puts $ show $ map snd var12
 
@@ -147,27 +159,10 @@ main = do
   system $ "pdflatex Figure3.tex"
   return ()
 
+allNonZero = all (>1e-8) 
+
 varDiff sess = do
-  meass <- fmap catMaybes $ inEverySession $ whenContinues sess $ do
-     rebaseRelativeTo sess
-     vm <- signalsDirect "vm"
-     sessionIdentifier <- getSessionName
-     sessionStart <- getSessionStart
-     spike <- events "spike" ()
-     running <- durations "running" ()
-     exclude <- durations "exclude" ()
-     let swings = (\(lo,hi) -> abs(hi-lo)) <$$> sigStat (minF `both` maxF) vm
-     let noGood = contains ((>5)//swings) running
-     let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
-     let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
-     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
-     let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
-     let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
-     let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
-     let measDur  = measureBl (-0.003, 0.003) (tpeak-0.001,0.001+tpeak) vm spikeg
-     --lift $ print (sessionIdentifier, tpeak)
-     lift $ print (sessionIdentifier, length spikeg, length measDur)
-     return $ Just measDur
+  meass <- measTrad sess  
 
   (wf, wfAmp, sigs) <- getWf sess
 
