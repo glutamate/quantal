@@ -22,6 +22,8 @@ import "probably" Math.Probably.FoldingStats
 import qualified Math.Probably.PDF as PDF
 import "probably" Math.Probably.NelderMead
 
+
+
 import System.IO
 import Data.Ord
 import System.Posix.Directory
@@ -39,5 +41,57 @@ import qualified Data.Array.IArray as IA
 
 
 main = do
- lns <- fmap lines $ readFile "/home/tomn/Dropbox/Quantal/Simmons/mar00.txt"
- print $ length lns
+ let fl = "mar01"
+ lns <- fmap lines $ readFile $ "/home/tomn/Dropbox/Quantal/Simmons/"++fl++".txt"
+ mapM print $ take 40 lns
+ let (vm, more) = (unParser getEpsp) lns
+ let ((filter (<114) . filter (>0.03)) -> trigs, _) = (unParser getTriggers) more
+ --mapM print $ take 10 trigs
+ print $ (realToFrac (length vm) * 0.0002)
+ let vmSig = Signal 0.0002 0 $ L.fromList vm
+ encodeFile (fl++"/bigvm") $ LoadSignals [vmSig]
+ encodeFile (fl++"/sigs_"++fl++"_epsps") $ LoadSignals (map (\t->limitSig (t-0.03) (t+0.17) vmSig) $ trigs)
+ encodeFile (fl++"/sigs_"++fl++"_noise") $ LoadSignals (map (\t->limitSig (t-0.23) (t-0.03) vmSig) $ tail trigs)
+ writeFile (fl++"/sessions") $ show [fl]
+ return ()
+
+getEpsp :: Parser String [Double]
+getEpsp = do
+  dropTillP ("\"START" `isPrefixOf`) 
+  repeatUntil (=="\r") read headP
+
+limitSig lo hi (Signal dt t0 arr) = 
+    let ndrop = round $ (lo - t0)/dt
+        ntake = round $ (hi - lo)/dt
+    in Signal dt lo (L.subVector ndrop ntake arr)
+
+
+getTriggers :: Parser String [Double]
+getTriggers = do
+  dropTillP ("\"Trig" `isPrefixOf`) 
+  _ <- headP
+  repeatUntil (=="\r") read headP
+
+  
+newtype Parser s a = Parser { unParser :: [s] -> (a,[s]) }
+
+instance Monad (Parser s) where
+   return x = Parser $ \ss -> (x,ss)
+   mx >>= f = Parser $ \ss -> let (x, ss') = unParser mx ss
+                              in unParser (f x) ss'
+
+headP = Parser $ \(s:ss) -> (s, ss)
+
+takeP n = Parser $ \(ss) -> splitAt n ss
+            
+dropTillP p = Parser go where
+   go [] = ((), [])
+   go (s:ss) | p s = ((), ss)
+             | otherwise = go ss
+
+repeatUntil :: Monad m => (a -> Bool) -> (a -> b) -> m a -> m [b]
+repeatUntil p f mx = do x <- mx
+                        if p x 
+                           then return []
+                           else liftM2 (:) (return (f x)) (repeatUntil p f mx)
+

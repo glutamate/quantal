@@ -172,7 +172,7 @@ epspSigs sess = do
 measNoise npars sess = runRIO $ do 
   LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
   let sigs = take 10 sigs'
-      initparv = if npars ==1 then [-5] else [2::Double, -2, -6, -10]
+      initparv = if npars ==1 then [-5] else [2::Double, 2, -6, -10]
       initialV = L.join $ map L.fromList [ take npars initparv, [sigAv $ head sigs]]    
   
   io$ print $ tmax/dt
@@ -184,7 +184,7 @@ measNoise npars sess = runRIO $ do
   --io $ print $ posteriorNoiseV sigs initial2
   --fail "foo" 
   let fixed = [] -- [((i,j),0) | i <- [npars..1+npars], j <- [npars..1+npars], i/=j]
-  laout@(init2,mbcor,_) <- io $ cacheIn (take 6 sess++"/laplaceNoise"++show npars) $ return $ laplaceApprox defaultAM {nmTol = 1, verboseNM = True,
+  laout@(init2,mbcor,_) <- io $ {-cacheIn (take 6 sess++"/laplaceNoise"++show npars) -} return $ laplaceApprox defaultAM {nmTol = 1, verboseNM = True,
                                                         initw = (\n -> if n<=npars-1 then 0.02 else 0.02)} 
                                              (posteriorNoiseV npars sigs) [] fixed initialV
   io $ print laout
@@ -195,7 +195,7 @@ measNoise npars sess = runRIO $ do
                  then do io $ print "starting from fresh"
                          sample $ initialAdaMet 200 (\n -> if n<=npars-1 then 5e-4 else 1e-3)  (posteriorNoiseV npars sigs) init2
                  else  initAdaMetFromCov 400 (posteriorNoiseV npars sigs) init2 0
-                                                                          (fromJust mbcor) 
+                                                                          (L.scale 0.1 $ fromJust mbcor) 
  --  iniampar <- sample $ initialAdaMet 100 (\n -> if n<=3 then 1e-3 else 1e-3)  (posteriorNoiseV sigs) init2 
 
   --io$ print $ iniampar
@@ -205,7 +205,7 @@ measNoise npars sess = runRIO $ do
  
   --io$ print $ froampar
 
-  vsamples <- runAdaMetRIO 5000 True (iniampar) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 5000 True (iniampar {scaleFactor = 1.1}) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
