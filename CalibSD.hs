@@ -35,31 +35,36 @@ import Graphics.Gnewplot.Histogram
 
 import Control.Monad.Trans
 
-main = getArgs >>= dispatch . head
-
+main = do --getArgs >>= dispatch . head
+  gen
+  main1
 dispatch "gen" = gen
 dispatch "pdf" = main1
 
 
+prelease = 0.75
+nrel = 25
+qreal = 0.01
+fnm = "/epsps_"++show nrel++"_"++show (round $ prelease*100)
+
 gen = runRIO $ do
-   let cholm = chol $ fillM (np+1,np+1) $ \(i,j)-> 
-                covOU thetaHat sigmaHat (toD i) (toD j)+ifObs i j obsHat
+   let covM = mkCovM (np+1) hatPars
+       covM1 = mkCovM (np) hatPars
+       cholm = chol $ covM
        sess = "calsd"
        tc = 170
        wft t = (((step (t-simt0))*tc*tc*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))
-       meanVec = (fillV np)$(\i-> wft (toD i))
-       covM = fillM (np,np) $
-              \(i,j)-> ((covOU (thetaHat) (sigmaHat::Double)) (toD i)) (toD j)+ifObs i j (obsHat)
-       invDetails = invlndet covM
-   h<- io $ openFile (take 6 sess++"/epsps") WriteMode 
-   forM_ [1..10000] $ \i-> do
-        amp <- sample $ binGaussFull 10 0.2 0.01 0.2 0
-        sig <- sample $ gpByChol dt tmax 
+       meanVec = (fillV (np))$(\i-> wft (toD i))
+       invDetails = invlndet covM1
+   h<- io $ openFile (take 6 sess++fnm) WriteMode 
+   forM_ [1..2000] $ \i-> do
+        amp <- sample $ binGaussFull nrel prelease qreal 0.2 0
+        sig <- sample $ gpByChol dt 
                           (\t-> amp*wft t)
                           cholm
         
-        let initialV = L.fromList [0.01,1]
-        case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV (Signal dt 0 meanVec) invDetails sig) [] initialV of
+        let initialV = L.fromList [0.01,0.1]
+        case laplaceApprox defaultAM {nmTol = 0.01} (posteriorSigV (Signal dt 0 meanVec) invDetails sig) [] [] initialV of
 
           (v, Just cor, smplx) -> do
                 let ampHat = v @> 1
@@ -68,17 +73,17 @@ gen = runRIO $ do
                 io $ hPutStrLn h $ show (i, ampHat,sd)
                 io $ print (i,amp, ampHat, sd)
    io $ hClose h 
-   io $ writeFile (take 6 sess++"/noisePars") $ show (log thetaHat, sigmaHat, log obsHat)
+   io $ writeFile (take 6 sess++"/noisePars") $ show hatPars
  
 post amps v = sum $ (flip map) amps $ \amp->
-               binGaussLogPdf (10) (0.2) (q) (0.01) (sd) amp
+               binGaussLogPdf (nrel) (prelease) (q) (0.01) (sd) amp
   where sd = v@>0
         q = v@> 1
 
 
 main1 = do
   let sess = "calsd"
-  h <- openFile ("FigCalSD.tex") WriteMode 
+{-  h <- openFile ("FigCalSD.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
@@ -90,23 +95,31 @@ main1 = do
      "\\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}",
      "\\usepackage{graphicx}",
      "\\begin{document}",
-     "\n"]
+     "\n"] -}
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
 
-  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (take 6 sess++"/epsps")
+  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (take 6 sess++fnm)
 
-  plotIt "dalahist" $ Histo 100 amps'
+  --plotIt "dalahist" $ Histo 100 amps'
   let glosd = runStat meanF sds
-  puts $ show $ glosd
+  print glosd
 
-  let lapars = laplaceApprox defaultAM {nmTol = 0.01} (post amps') [] $ L.fromList [glosd, 0.01]
-  puts $ "\\begin{verbatim}"++show lapars++"\\end{verbatim}"
+  let lapars@(mid,_,_) = laplaceApprox defaultAM {nmTol = 0.001} (post amps') [] [] $ L.fromList [glosd, 0.01]
+  print lapars
+  putStr "ratio="
+  print $ (mid@>0)/glosd
+
+  putStr "ratioVar="
+  print $ ((mid@>0)/glosd)^2
+
+  putStr "npq="
+  print $ nrel*prelease*0.01
 
 
-  puts "\\end{document}"
-  hClose h
+--  puts "\\end{document}"
+  --hClose h
 
-  system $ "pdflatex FigCalSD.tex"
+  --system $ "pdflatex FigCalSD.tex"
   return ()
 
 plotSamPdf nm h sam pdf = do

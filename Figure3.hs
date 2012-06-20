@@ -87,7 +87,7 @@ main = do
 
   (wf, wfAmp, sigs) <- getWf sess
 
-  puts $ "wfamp= "++show wfAmp++"\n"
+  --puts $ "wfamp= "++show wfAmp++"\n"
 
 
   let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
@@ -112,7 +112,7 @@ main = do
   let rngIt x = Points [PointType 7] $ XRange 10 4000 $ YRange (-0.3) 1.6 x
 
   plotIt "pcurve1" $ (YLabel "Estimated amplitude (mV)" $ ("Window", rngIt measPts)) :||: (YTics [] $ ("Least squares", rngIt tsamps1))
-  plotIt "pcurve2" $ (YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (YTics [] $ ("OU + obs", rngIt tsamps3))
+        :==: ((YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (YTics [] $ ("OU + obs", rngIt tsamps3)))
 
  
 --  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
@@ -141,7 +141,7 @@ main = do
 
   var12 <- forM datasess $ \sess1 -> do
      vars <- varDiff sess1
-     puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
+     --puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
      return vars 
 
   let vars = map (runStat meanF) $ transpose $ filter allNonZero var12

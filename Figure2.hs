@@ -99,10 +99,10 @@ main = do
              vsample <- fmap ( L.toList ) $ sample $ oneOf vsamples'
              let vsample1 = if npars == 4 then take 2 vsample ++ [(vsample!!2)-2, vsample!!3] else vsample
              let cholm = L.chol $ mkCovM (np+1) $ take npars $ vsample1
-             sample $ sequence $ replicate 4 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
+             sample $ sequence $ replicate 10 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
     
 
-  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 5 $ do
+  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 20 $ do
                          sigs <-  mkFakeSigs npars fnm                          
                          return (avSigs $ map autoCorrSig $ sigs, map sigSpan sigs) 
 
@@ -123,19 +123,19 @@ main = do
   fakesigs1 <- runRIO $  mkFakeSigs 1 (take 6 sess++"/noise_samples1")
   fakeautocorr1 <- mkFakeAutoCorr 1 (take 6 sess++"/noise_samples1")
 
-  plotIt "plotr" $ realNoise :||: Noplot
+  --plotIt "plotr" $ realNoise :||: Noplot
 
 
-  plotIt "plot4" $ fakesigs4 :||: mkAutoCorrPlot fakeautocorr4
-  plotIt "plot3" $ fakesigs3 :||: mkAutoCorrPlot fakeautocorr3
-  plotIt "plot2" $ fakesigs2  :||: mkAutoCorrPlot fakeautocorr2
-  plotIt "plot1" $ fakesigs1 :||: mkAutoCorrPlot fakeautocorr1
+  --plotIt "plot4" $ fakesigs4 :||: mkAutoCorrPlot fakeautocorr4
+  --plotIt "plot3" $ fakesigs3 :||: mkAutoCorrPlot fakeautocorr3
+  --plotIt "plot2" $ fakesigs2  :||: mkAutoCorrPlot fakeautocorr2
+  --plotIt "plot1" $ fakesigs1 :||: mkAutoCorrPlot fakeautocorr1
 
 
 
   --plotIt "fig2" $ ((realNoise :==: fakeNoise3) :||: autoCorr3) :==: lowplot
-  plotIt "fig2" $ (plot3v  (C $ mkAutoCorrPlot fakeautocorr3) (Aii fakesigs1) (Ai realNoise)) 
-                   :||: (B $ plot3v ("theta", thetahist) ("sigma", sigmahist) ("observation", obshist))
+  --plotIt "fig2" $ (plot3v  (C $ mkAutoCorrPlot fakeautocorr3) (Aii fakesigs1) (Ai realNoise)) 
+  --                 :||: (B $ plot3v ("theta", thetahist) ("sigma", sigmahist) ("observation", obshist))
 
   --plotIt "sigma" $ ("sigma", zip [(0::Double)..] $map (@>0) vsamples)
   --plotIt "theta" $ ("theta",  zip [(0::Double)..] $map (@>1) vsamples)
@@ -143,12 +143,12 @@ main = do
   --plotIt "flat" $ ("flat", zip [(0::Double)..] $ map  (exp . (@>3)) vsamples)
 
   puts $ "sigspan real = "++ show (runStat meanF $ map sigSpan realNoise) ++"\n\n"
-  puts $ "sigspan model1 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr1) ++"\n\n"
-  puts $ "sigspan model2 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr2) ++"\n\n"
+  --puts $ "sigspan model1 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr1) ++"\n\n"
+  --puts $ "sigspan model2 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr2) ++"\n\n"
   puts $ "sigspan model3 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr3) ++"\n\n"
-  puts $ "sigspan model4 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr4) ++"\n\n"
+  --puts $ "sigspan model4 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr4) ++"\n\n"
 
-  plotIt "spanhists" $ ("1", Histo 10 (map (runStat meanF . snd) fakeautocorr1)) :+:
+  let spanhists = ("1", Histo 10 (map (runStat meanF . snd) fakeautocorr1)) :+:
                        ("2", Histo 10 (map (runStat meanF . snd) fakeautocorr2)) :+:
                        ("3", Histo 10 (map (runStat meanF . snd) fakeautocorr3)) :+:
                        ("4", Histo 10 (map (runStat meanF . snd) fakeautocorr4)) 
@@ -159,10 +159,21 @@ main = do
      vsams2::[L.Vector Double] <-  readFile' (take 6 dsess++"/noise_samples2")
      return ((dsess, zip (map (@>0) vsams2) (map (exp . (@>1)) vsams2)), (dsess, zip (map (@>0) vsams3) (map (exp . (@>1)) vsams3)), (dsess, zip (map (exp . (@>2)) vsams3) (map (exp . (@>1)) vsams3)))
      
-  plotIt "scatpars2" $ ManySup $ fst3 scatters
-  plotIt "scatpars3" $ ManySup $ snd3 scatters
-  plotIt "scatpars4" $ ManySup $ trd3 scatters
+  --plotIt "scatpars2" $ ManySup $ fst3 scatters
+  --plotIt "scatpars3" $ ManySup $ snd3 scatters
+  --plotIt "scatpars4" $ ManySup $ trd3 scatters
 
+
+  --let datareal = realNoise
+  let triplot a b c = 33% a :|: 67%(b :||: c)
+
+
+  let topRow = 33% realNoise :|: 67%(fakesigs2 :||: fakesigs3)
+  let midRow = triplot (ManySup $ fst3 scatters ) (ManySup $ snd3 scatters) (ManySup $ trd3 scatters)
+  let botPlot = spanhists :||: mkAutoCorrPlot fakeautocorr3
+
+  plotIt "finalFigure1" $ (realNoise :||: fakesigs1) :==: (fakesigs2 :||: fakesigs3)
+  plotIt "finalFigure2" $ ((ManySup $ fst3 scatters ) :||: (ManySup $ snd3 scatters)) :==: ((ManySup $ trd3 scatters):||: (spanhists :==: mkAutoCorrPlot fakeautocorr3))
 
   puts "\\end{document}"
   hClose h

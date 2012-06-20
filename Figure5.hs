@@ -39,8 +39,8 @@ import MPFA
 
 
 main = do
-  sess <- getSess "fg5sm1"
-----let sess = "fg5sm1"
+  sess <- getSess "f5sm1"
+
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
@@ -62,7 +62,7 @@ main = do
   print wfAmp
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps")
+  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps3")
   let tsamps = filter (getFilter sess) $ zip t0s' $ map (*wfAmp) amps'
       t0s = map fst tsamps
 
@@ -108,6 +108,13 @@ main = do
   puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
 
   puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
+
+  hists <- forM [0..20] $ \i -> do
+       print i
+       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile ("f5sm"++show i++"/npq_samples")
+       return $ HistoStyle "histeps" 25 $ map (roundD . (@>0)) vsams
+
+  plotIt "manyn" $ ManySup hists
 
   puts "\\end{document}"
   hClose h

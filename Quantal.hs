@@ -123,9 +123,9 @@ simulateAll nss ntrs = do
        system $ "./Quantal "++sessnm++" 34"
 
 
-simulate4 sess nstart  = 
-  forM_ [0..3] $ \i -> do
-    simulate (sess++show (i+read ( head nstart))) ["50", "1000"]
+simulate4 sess (nstarst:nsims:_)  = 
+  forM_ [0..(read nsims-1)] $ \i -> do
+    simulate (sess++show (i+read nstarst)) ["50", "1000"]
   
 
 simulate sess rest = runRIO $ do
@@ -136,7 +136,7 @@ simulate sess rest = runRIO $ do
   io $ encodeFile (take 6 sess++"/sigs_"++take 6 sess++"_epsps") $ LoadSignals sigs 
   io $ writeFile (take 6 sess++"/noisePars3") $ show hatPars
   io $ writeFile (take 6 sess++"/sessions") $ show [sess]
-  io $ system $ "~/.cabal/bin/quantal "++sess++" e"
+  io $ system $ "~/.cabal/bin/quantal "++sess++" e" 
   io $ system $ "~/.cabal/bin/quantal "++sess++" 4"
   return ()
 
@@ -205,7 +205,7 @@ measNoise npars sess = runRIO $ do
  
   --io$ print $ froampar
 
-  vsamples <- runAdaMetRIO 5000 True (iniampar {scaleFactor = 1.1}) (posteriorNoiseV npars sigs) 
+  vsamples <- runAdaMetRIO 5000 True (iniampar {scaleFactor = 1.5}) (posteriorNoiseV npars sigs) 
   let vsmn = L.toList$ L.subVector 0 npars $ runStat meanF vsamples
 {-      vsamTup = case vsmn of 
                    [sigma, logtheta, logobs, logsmooth] -> show (sigma, logtheta, logobs, logsmooth)
@@ -286,7 +286,7 @@ measNPQ sess = runRIO $ do
   let weighCurve' = map (weighRegression tsamps ) t0s
       maxPcurve = foldl1 max weighCurve'
       pcurve = map (/(maxPcurve)) weighCurve'
-  let globalSd = runStat ( meanF) sds
+  let globalSd = (/(sqrt 2)) $ runStat ( meanF) sds
 
 --  let initialV = (L.fromList [100,-10,0.6,-3]:: L.Vector Double)
  
@@ -320,7 +320,7 @@ measNPQ sess = runRIO $ do
   iniampar1 <- initAdaMetFromCov 10000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
-  vsamples <- runAdaMetRIO nsam True (iniampar {scaleFactor = 2.1}) (posteriorNPQV amps pcurve globalSd) 
+  vsamples <- runAdaMetRIO nsam True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 

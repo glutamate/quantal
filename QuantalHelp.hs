@@ -97,7 +97,7 @@ betaInit = \a-> \b-> a/(a+b)
 alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOUOld = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
-dt = 5.000e-5 -- 0.0002 -- 5.000e-5
+dt = 1.000e-4 -- 0.0002 -- 5.000e-5
 tmax = 0.1 --0.2
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
@@ -299,7 +299,7 @@ fastNPQ pdfN n0 par0 = fN initLike (n0-1) par0 where
                                  then fN thislike (nlast+1) thispars
                                  else (pars, nlast, lastLike, simp)
   optimise n pars = let pdf = pdfN n
-                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 0.1} pdf [] [] pars
+                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 5} pdf [] [] pars
                         --(maxPost,hess) = hessianFromSimplex (negate . pdfN) [] $ augmentSimplex n smplx 
                         like = pdf maxV
                       in  trace ("laplace"++show n++": "++show maxV++" lh="++show like) $ (like, maxV, smplx)
