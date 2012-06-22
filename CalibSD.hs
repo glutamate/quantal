@@ -36,16 +36,16 @@ import Graphics.Gnewplot.Histogram
 import Control.Monad.Trans
 
 main = do --getArgs >>= dispatch . head
-  gen
+--  gen
   main1
 dispatch "gen" = gen
 dispatch "pdf" = main1
 
 
-prelease = 0.75
-nrel = 25
+prelease = 0.5
+nrel = 50
 qreal = 0.01
-fnm = "/epsps_"++show nrel++"_"++show (round $ prelease*100)
+fnm = "/epsps_"++show nrel++"_"++show (round $ prelease*100)++"_"++show (round $ qreal*10000)
 
 gen = runRIO $ do
    let covM = mkCovM (np+1) hatPars
@@ -57,7 +57,7 @@ gen = runRIO $ do
        meanVec = (fillV (np))$(\i-> wft (toD i))
        invDetails = invlndet covM1
    h<- io $ openFile (take 6 sess++fnm) WriteMode 
-   forM_ [1..2000] $ \i-> do
+   forM_ [1..1000] $ \i-> do
         amp <- sample $ binGaussFull nrel prelease qreal 0.2 0
         sig <- sample $ gpByChol dt 
                           (\t-> amp*wft t)
@@ -76,9 +76,14 @@ gen = runRIO $ do
    io $ writeFile (take 6 sess++"/noisePars") $ show hatPars
  
 post amps v = sum $ (flip map) amps $ \amp->
-               binGaussLogPdf (nrel) (prelease) (q) (0.01) (sd) amp
+               binGaussLogPdf (nrel) (prelease) (q) (0.2) (sd) amp
   where sd = v@>0
         q = v@> 1
+
+binGaussFull ns p q cv bgSd = do
+     nr  <- binomial ns p
+     siteAmps <- forM [0..(nr-1)] $ const $ gaussD q (q*cv)
+     gaussD (sum siteAmps) (bgSd)
 
 
 main1 = do
@@ -100,11 +105,20 @@ main1 = do
 
   (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (take 6 sess++fnm)
 
+
+--  print (bigSum 1 5 id, bigLogSum 1 5 id)
+  --print (log $ 4343+1132 , logadd 4343 1132)
+
   --plotIt "dalahist" $ Histo 100 amps'
   let glosd = runStat meanF sds
+  putStr "obssd="
   print glosd
 
-  let lapars@(mid,_,_) = laplaceApprox defaultAM {nmTol = 0.001} (post amps') [] [] $ L.fromList [glosd, 0.01]
+  putStr "pdf="
+  print $ post amps' $ L.fromList [glosd, qreal]
+
+
+  let lapars@(mid,_,_) = laplaceApprox defaultAM {nmTol = 0.001} (post amps') [] [] $ L.fromList [glosd, qreal]
   print lapars
   putStr "ratio="
   print $ (mid@>0)/glosd
@@ -113,9 +127,16 @@ main1 = do
   print $ ((mid@>0)/glosd)^2
 
   putStr "npq="
-  print $ nrel*prelease*0.01
+  print $ nrel*prelease*qreal
 
+  putStr "ratioVar="
+  print $ ((mid@>0)/glosd)^2
 
+  putStr "varratio times npq="
+  print $ (((mid@>0)/glosd)^2) / (nrel*prelease*qreal )
+
+  putStr "n,p,q="
+  print $ [nrel, prelease, qreal]
 --  puts "\\end{document}"
   --hClose h
 
@@ -140,10 +161,6 @@ plotSamPdf nm h sam pdf = do
      nr  <- binomial ns p
      gaussD (realToFrac nr * q) (sqrt $ q*cv*q*cv*realToFrac nr + bgSd*bgSd) -}
 
-binGaussFull ns p q cv bgSd = do
-     nr  <- binomial ns p
-     siteAmps <- forM [0..(nr-1)] $ const $ gaussD q (q*cv)
-     gaussD (sum siteAmps) (bgSd)
 
 {-binGaussLogPdf ns p q cv bgSd v 
    = log $ bigSum 0 ns $ \nr -> exp $ (normalLogPdf (realToFrac nr * q) (varToTau $ q*cv*q*cv*realToFrac nr + bgSd*bgSd) v) +  (binomialLogProb ns p nr) -}

@@ -61,7 +61,7 @@ normalLogPdf = \mu-> \tau-> \x-> (log (sqrt ((tau/2.000)*pi)))+(0.000-(((x-mu)*(
 sdToTau = \sd-> 1.000/((2.000*sd)*sd)
 meanCVToTau = \mn-> \cv-> 1.000/((2.000*(cv*mn))*(cv*mn))
 varToTau :: Double -> Double
-varToTau = \var-> 1.000/(2.000*var)
+varToTau = \var-> recip $ 2*var
 tauToSD = \t-> 1.000/(sqrt (t*2.000))
 logNormal = \mu-> \tau-> (fmap exp)$(normal mu tau)
 logNormalPdf = \mu-> \tau-> \x-> ((sqrt tau)*(1.000/x))*(exp (0.000-(((tau*((log x)-mu))*((log x)-mu))/2.000)))
@@ -75,6 +75,21 @@ binomialLogProb' n p k | k > n = binomialLogProb' n p n
                        | n < 0 = error "n zero"
                        | otherwise = ((log$(choose n k))+((realToFrac k)*(log p)))+((realToFrac (n-k))*(log (1.000-p)))
 
+bigLogExpSum lo hi f =  log_sum_exp $ map f [lo..hi]
+
+
+log_sum_exp xs =  
+
+  -- Choose c to be the element of v that is largest in absolute value.
+  let max = runStat maxF xs
+      maxabs = runStat (before maxF abs) xs
+      c = max {-if ( maxabs > max ) 
+             then runStat minF xs
+             else max -}
+
+  in log(sum  $ map (\x-> exp(x-c)) xs) + c
+
+
 countTrue = \_arg0-> case _arg0 of Nil  -> 0; Cons True  bs -> 1+(countTrue bs); Cons False  bs -> countTrue bs
 betaLogPdf = \a-> \b-> \x-> log$(((1.000/(S.beta (realToFrac a) (realToFrac b)))*(x^(a-1)))*((1.000-x)^(b-1)))
 unfoldN = \n-> \m-> \lastx-> \s-> if (n<m) then ((s n lastx)>>=(\x-> (((unfoldN (n+1) m) x) s)>>=(\xs-> return (Cons x xs)))) else ((s n lastx)>>=(\v-> return (Cons v Nil)))
@@ -82,11 +97,22 @@ unfold = \n-> \lastx-> \s-> ((unfoldN 1 n) lastx) s
 binGauss = \ns-> \p-> \q-> \cv-> \bgSd-> (binomial ns p)>>=(\nr-> normal ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd))))
 binGaussPdf = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 0 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
 
-binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
+--binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
 
-binGaussLogPdf = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> log$((bigSum 0 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
+-- log(x + y) = log(x) + log(1 + exp(log(y) - log(x)))
+-- http://www.perlmonks.org/index.pl?node_id=974222
+--binGaussLogPdf' = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> log$((bigSum 0 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
 
-binGaussFrom1LogPdf ns p q  cv bgSd v = log$((bigSum 1 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
+binGaussLogPdf :: Int -> Double -> Double -> Double -> Double -> Double -> Double 
+binGaussLogPdf ns p q cv  bgSd v = 
+   bigLogExpSum 0 ns $ \nr-> 
+       normalLogPdf ((realToFrac nr)*q) (varToTau$ f1*(realToFrac nr)+f2) v
+     + binomialLogProb ns p nr
+ where f1 = q*cv*q*cv
+       f2 = bgSd*bgSd
+        
+
+--binGaussFrom1LogPdf ns p q  cv bgSd v = log$((bigSum 1 ns)$(\nr-> exp$(((normalLogPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)+((binomialLogProb ns p) nr))))
 
 
 normalInit = \mu-> \(_) -> mu
@@ -97,7 +123,7 @@ betaInit = \a-> \b-> a/(a+b)
 alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOUOld = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
-dt = 1.000e-4 -- 0.0002 -- 5.000e-5
+dt = 5.000e-5 -- 0.0002 -- 5.000e-5
 tmax = 0.1 --0.2
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
@@ -277,7 +303,7 @@ posteriorSigV wf invDetails sig v
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
  oneToLogPdf (800) n
- +uniformLogPdf 0.00001 0.5 cv
+ + normalLogPdf (-1.9) 100 (log cv) -- uniformLogPdf 0.00001 0.5 cv
  +uniformLogPdf (0) (1) phi
  +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->
@@ -466,7 +492,7 @@ getFilter sess = case find (\(s,v) -> s `isPrefixOf` sess) filters of
                   Just (s,v) -> v
                   Nothing -> const True
 
-posteriorTop pcurve amparloops v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
+{-posteriorTop pcurve amparloops v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
  oneToLogPdf (800) n
  +uniformLogPdf 0.00001 0.5 cv
  +uniformLogPdf (0) (1) phi
@@ -483,7 +509,7 @@ posteriorTop pcurve amparloops v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loop
         --relfracs = map ( (@>0) .  ampPar) amparloops
         amps =map ( (@>0) .  ampPar) amparloops
 
-
+-}
 getSess def = do
   args <- getArgs 
   case args of 
@@ -532,7 +558,7 @@ getWf' sess = do
 
 
 
-posteriorLoop wf invDetails ampartop pcurveVal sig v 
+{-posteriorLoop wf invDetails ampartop pcurveVal sig v 
   = binomialLogProb (n) (p) nr +
     normalLogPdf (realToFrac nr*q) (varToTau (q*cv*q*cv*(realToFrac nr))) amp +
     ouSynapseLogPdf invDetails (scaleSig (v0) amp wf) sig
@@ -594,7 +620,7 @@ runGibbs' ((n,topcool):rest) sd amps pcurve pars xs = do
       runGibbs' ((n-2,topcool):rest) sd amps pcurve newpars
                 (L.join (map ampPar [p1,head p3]):xs)
 
-
+-}
 reset_counts n ampar = ampar { count = n, count_accept = n `div` 2} 
 
 shrink x ampar = ampar {ampCov = L.scale (recip x) $ ampCov ampar} 

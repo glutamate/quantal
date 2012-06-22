@@ -59,7 +59,7 @@ main = do
 
   (wf, wfAmp, sigs) <- getWf sess
 
-  print wfAmp
+  --print wfAmp
 
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
   (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps3")
@@ -80,8 +80,8 @@ main = do
 
   vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
 
-  print $ head vsamples
-  print $ last vsamples
+  --print $ head vsamples
+  --print $ last vsamples
 
 
   let ns = map (roundD . (@>0)) vsamples
@@ -109,18 +109,40 @@ main = do
 
   puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
-  hists <- forM [0..20] $ \i -> do
-       print i
-       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile ("f5sm"++show i++"/npq_samples")
-       return $ HistoStyle "histeps" 25 $ map (roundD . (@>0)) vsams
+  pcts <- forM [0..41] $ \i -> do
+--       putStrLn 
+       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 100 . read) $ readFile ("f5sm"++show i++"/npq_samples")
+       let ns = map (@>0) vsams
+           phis = map (@>2) vsams
+           pct =percentile' 50 ns
+       print (pct, percentile' 0.8 phis)
+       return $ (pct, percentile' 0.8 phis)
+       --return $ HistoStyle "histeps" 25 $ ns 
 
-  plotIt "manyn" $ ManySup hists
+  plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst pcts
+  plotIt "cookp" $ zip [(0::Double)..] $ sort $ map snd pcts
+
+  --print $ percentile' 0.3 [0.0, 0.001..1]
 
   puts "\\end{document}"
   hClose h
 
   system $ "pdflatex Figure5.tex"
   return ()
+
+percentile x sorted_xs = 
+  let n = realToFrac $ length sorted_xs
+      go y [] = 0
+      go y (x:xs) | y >= x    = realToFrac $ length xs + 1 
+                  | otherwise = go y xs
+  in go x sorted_xs / n
+
+percentile' :: Double -> [Double] -> Double
+percentile' x unsorted_xs = go x unsorted_xs 0 0 where
+      go _ []     above below = below / (above+below)
+      go y (x:xs) above below | y >= x    = go y xs above (below+1)
+                              | otherwise = go y xs (above+1) below
+
 
 roundD :: Double -> Double
 roundD = realToFrac . round
