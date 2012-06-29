@@ -36,7 +36,7 @@ import Graphics.Gnewplot.Histogram
 import Control.Monad.Trans
 
 main = do --getArgs >>= dispatch . head
---  gen
+  gen
   main1
 dispatch "gen" = gen
 dispatch "pdf" = main1
@@ -44,7 +44,7 @@ dispatch "pdf" = main1
 
 prelease = 0.5
 nrel = 50
-qreal = 0.01
+qreal = simq
 fnm = "/epsps_"++show nrel++"_"++show (round $ prelease*100)++"_"++show (round $ qreal*10000)
 
 gen = runRIO $ do
@@ -57,7 +57,7 @@ gen = runRIO $ do
        meanVec = (fillV (np))$(\i-> wft (toD i))
        invDetails = invlndet covM1
    h<- io $ openFile (take 6 sess++fnm) WriteMode 
-   forM_ [1..1000] $ \i-> do
+   forM_ [1..10000] $ \i-> do
         amp <- sample $ binGaussFull nrel prelease qreal 0.2 0
         sig <- sample $ gpByChol dt 
                           (\t-> amp*wft t)

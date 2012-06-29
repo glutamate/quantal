@@ -37,9 +37,18 @@ import Control.Monad.Trans
 
 import MPFA
 
+getMPFA nseg globalSd tsamps =   
+  let mnvars = mpfa nseg tsamps
+
+      inimpfa = L.fromList $ [50, 0.04, 0.1, (foldl1 max $ map fst mnvars)*1.1]
+      laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.001} 
+                                      (likeMPFA globalSd mnvars) [] [] 
+                                      $ inimpfa
+  in laprs
+
 
 main = do
-  sess <- getSess "f5sm1"
+  sess <- getSess "f7sm20"
 
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
@@ -70,7 +79,7 @@ main = do
   let weighCurve' = map (weighRegression tsamps ) t0s
       maxPcurve = foldl1 max weighCurve'
       pcurve = map (/(maxPcurve)) weighCurve'
-  let globalSd = sqrt $ runStat (before meanF (**2)) sds
+  let globalSd = runStat  meanF sds
 
   plotIt "pcurve" $ zip t0s pcurve :+: tsamps
 
@@ -91,7 +100,7 @@ main = do
   plotIt "pplot" $ zip [(0::Double)..] $ ps
   plotIt "qplot" $ zip [(0::Double)..] $ qs
 
-  plotIt "nhist" $ Histo 50 $ ns
+  plotIt "nhist" $ Histo 25 $ ns
   plotIt "phist" $ Histo 50 $ ps
   plotIt "qhist" $ Histo 50 $ qs
 
@@ -99,29 +108,36 @@ main = do
   plotIt "nqcor" $ zip ns qs
   plotIt "pqcor" $ zip qs ps
 
-  {-let mnvars = mpfa 100 tsamps
+  let mnvars = mpfa 200 tsamps
 
   plotIt "mpfa" $ mnvars
 
-  let laprs@(mn1,_,_) = laplaceApprox defaultAM (likeMPFA globalSd mnvars) [] [] (L.fromList $ [100, 0.04, 0.1, 0.1]++map (const 0.5) mnvars)
+  let inimpfa = L.fromList $ [100, log 0.04, log 0.1, log 0.1]
+  let laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.001} 
+                                      (likeMPFA globalSd mnvars) [] [] 
+                                      $ inimpfa
+
+  puts $ "likeMPFA init="++show (likeMPFA globalSd mnvars inimpfa)
+  puts $ "likeMPFA final="++show (likeMPFA globalSd mnvars mn1)
 
   puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
 
-  puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
+  {-puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
-  pcts <- forM [0..41] $ \i -> do
+  pcts <- forM [0..1] $ \i -> do
 --       putStrLn 
-       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 100 . read) $ readFile ("f5sm"++show i++"/npq_samples")
-       let ns = map (@>0) vsams
+       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 100 . read) $ readFile ("f7sm"++show i++"/npq_samples")
+       let ns = map (minus1 . (@>0)) vsams
            phis = map (@>2) vsams
            pct =percentile' 50 ns
        print (pct, percentile' 0.8 phis)
-       return $ (pct, percentile' 0.8 phis)
+       return $ (pct, percentile' 0.8 phis, (HistoStyle "histeps" 25 $ ns, HistoStyle "histeps" 25 $ phis))
        --return $ HistoStyle "histeps" 25 $ ns 
 
-  plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst pcts
-  plotIt "cookp" $ zip [(0::Double)..] $ sort $ map snd pcts
-
+  plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst3 pcts
+  plotIt "cookp" $ zip [(0::Double)..] $ sort $ map snd3 pcts
+  plotIt "cookhn" $ ManySup $ map ( fst . trd3)  pcts
+  plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts
   --print $ percentile' 0.3 [0.0, 0.001..1]
 
   puts "\\end{document}"
@@ -129,6 +145,8 @@ main = do
 
   system $ "pdflatex Figure5.tex"
   return ()
+
+minus1 x = x+1
 
 percentile x sorted_xs = 
   let n = realToFrac $ length sorted_xs

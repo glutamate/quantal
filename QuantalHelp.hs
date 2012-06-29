@@ -56,8 +56,10 @@ oneToLogPdf = \hi-> \x-> if ((x<(hi+1))&&(x>0)) then 1.000 else (0.000-1.000e50)
 normal = \mean-> \tau-> unormal>>=(\u-> return ((u/(sqrt (tau*2.000)))+mean))
 normalSd = \mean-> \sd-> unormal>>=(\u-> return ((u*sd)+mean))
 normalPdf = \mu-> \tau-> \x-> (sqrt ((tau/2.000)*pi))*(exp (0.000-(((x-mu)*(x-mu))*tau)))
+
 normalLogPdf :: Double -> Double -> Double -> Double
 normalLogPdf = \mu-> \tau-> \x-> (log (sqrt ((tau/2.000)*pi)))+(0.000-(((x-mu)*(x-mu))*tau))
+
 sdToTau = \sd-> 1.000/((2.000*sd)*sd)
 meanCVToTau = \mn-> \cv-> 1.000/((2.000*(cv*mn))*(cv*mn))
 varToTau :: Double -> Double
@@ -89,15 +91,26 @@ log_sum_exp xs =
 
   in log(sum  $ map (\x-> exp(x-c)) xs) + c
 
+binGaussFull ns p q cv bgSd = do
+     nr  <- binomial ns p
+     siteAmps <- sequence $ replicate nr $ normalSd q (q*cv)
+     normalSd (sum siteAmps) (bgSd)
+
+binGaussFullNoBgSd ns p q cv = do
+     nr  <- binomial ns p
+     siteAmps <- sequence $ replicate nr $ normalSd q (q*cv)
+     return $ sum siteAmps
 
 countTrue = \_arg0-> case _arg0 of Nil  -> 0; Cons True  bs -> 1+(countTrue bs); Cons False  bs -> countTrue bs
 betaLogPdf = \a-> \b-> \x-> log$(((1.000/(S.beta (realToFrac a) (realToFrac b)))*(x^(a-1)))*((1.000-x)^(b-1)))
 unfoldN = \n-> \m-> \lastx-> \s-> if (n<m) then ((s n lastx)>>=(\x-> (((unfoldN (n+1) m) x) s)>>=(\xs-> return (Cons x xs)))) else ((s n lastx)>>=(\v-> return (Cons v Nil)))
 unfold = \n-> \lastx-> \s-> ((unfoldN 1 n) lastx) s
+
 binGauss = \ns-> \p-> \q-> \cv-> \bgSd-> (binomial ns p)>>=(\nr-> normal ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd))))
+
 binGaussPdf = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 0 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
 
---binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
+binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((normalPdf ((realToFrac nr)*q) (varToTau$(((((q*cv)*q)*cv)*(realToFrac nr))+(bgSd*bgSd)))) v)*((binomialProb ns p) nr))
 
 -- log(x + y) = log(x) + log(1 + exp(log(y) - log(x)))
 -- http://www.perlmonks.org/index.pl?node_id=974222
@@ -302,10 +315,10 @@ posteriorSigV wf invDetails sig v
        amp = v@>1       
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
- oneToLogPdf (800) n
- + normalLogPdf (-1.9) 100 (log cv) -- uniformLogPdf 0.00001 0.5 cv
+-- oneToLogPdf (800) n
+ {-normalLogPdf (-1.9) 100 (log cv) -} uniformLogPdf 0 0.5 cv
  +uniformLogPdf (0) (1) phi
- +uniformLogPdf (0.000) (1) q
+-- +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->
                let p=pcurveVal * phi 
                in binGaussLogPdf (n) (p) (q) (cv) (sd) amp)
@@ -320,12 +333,27 @@ fastNPQ :: (Int -> Vec -> Double) -> Int -> Vec -> (Vec, Int, Double, Simplex)
 fastNPQ pdfN n0 par0 = fN initLike (n0-1) par0 where
   initLike = -1e20 -- fst $ optimise n0 par0
 
+  fN lastLike nlast pars = let (thislike, thispars, simp) = optimise (nlast-1) pars
+                           in if thislike > lastLike 
+                                 then fN thislike (nlast-1) thispars
+                                 else (pars, nlast, lastLike, simp)
+  optimise n pars = let pdf = pdfN n
+                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 0.001} pdf [] [] pars
+                        --(maxPost,hess) = hessianFromSimplex (negate . pdfN) [] $ augmentSimplex n smplx 
+                        like = pdf maxV
+                      in  trace ("laplace"++show n++": "++show maxV++" lh="++show like) $ (like, maxV, smplx)
+
+
+fastNPQup :: (Int -> Vec -> Double) -> Int -> Vec -> (Vec, Int, Double, Simplex)
+fastNPQup pdfN n0 par0 = fN initLike (n0-1) par0 where
+  initLike = -1e20 -- fst $ optimise n0 par0
+
   fN lastLike nlast pars = let (thislike, thispars, simp) = optimise (nlast+1) pars
                            in if thislike > lastLike 
                                  then fN thislike (nlast+1) thispars
                                  else (pars, nlast, lastLike, simp)
   optimise n pars = let pdf = pdfN n
-                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 5} pdf [] [] pars
+                        (maxV, _,smplx) = laplaceApprox defaultAM {nmTol = 0.001} pdf [] [] pars
                         --(maxPost,hess) = hessianFromSimplex (negate . pdfN) [] $ augmentSimplex n smplx 
                         like = pdf maxV
                       in  trace ("laplace"++show n++": "++show maxV++" lh="++show like) $ (like, maxV, smplx)
@@ -433,7 +461,7 @@ minWidth n s | len < n = s ++ replicate (n - len) ' '
              | otherwise = s
   where len = length s
 
-simq = 4.000e-4
+simq = 8.000e-4
 --simn = 50
 
 --simntrials = 1000
@@ -453,7 +481,7 @@ fakesam simn ntrials = return 0.150>>=(\cv->
         (return 170.000)>>=(\tc-> 
         (for 1 ntrials)$(\i-> 
             let p = phi-((phi-plo)/(1.000+(exp (soffset*sslope-sslope*realToFrac i)))) 
-            in ((((binGauss simn p) q) cv) 0.000)>>=(\amp-> 
+            in (((binGaussFullNoBgSd simn p) q) cv)>>=(\amp-> 
                (return (0-60.000))>>=(\vstart-> 
                ((gpByChol dt) 
                           (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 

@@ -44,8 +44,15 @@ mpfa t evs =
       segs = map (:[]) $ takeWhile (not . (>maxt) . fst . fst) $ tsegs t
       f seg = case during seg evs of
          [] -> []
-         tamps -> [runStat (meanF `both` varF) $ map snd tamps]
+         tamps -> [meanVarDetrended tamps]
   in concatMap f segs 
+
+meanVarDetrended :: [(Double, Double)] -> (Double, Double)
+meanVarDetrended pts = (mean, var) where
+    (slope, offset) = runStat regressF $ pts
+    mean = runStat meanF $ map snd pts
+    detrended = map (\(t,amp)-> amp - (slope*t + offset)) pts
+    var = runStat varF $ detrended
 
 
 
@@ -120,6 +127,21 @@ dmeans = map (runStat meanF) dat
 likeMPFA :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
 likeMPFA bgSd meanvars v = 
     let n = v@>0
+        q = exp $ v@> 1
+        varvar = exp $ v@>2
+        imax = (foldl1 max $ map fst meanvars) * (1+ exp(v@>3))
+--        dist1 (x1,y1) (x2,y2) = sqrt $ (x2-x1)^^2 + (y2-y1)^^2
+--        dist = sum $ map (uncurry dist1) $ zip meanvars (zip predmean predvar)
+        
+    in sum $ flip map (meanvars ) 
+           $ \(mean, var) -> let p = mean/imax
+                                 predvar = n*p*(1-p)*q*q+bgSd*bgSd
+                             in PDF.gaussD (predvar) (varvar) var
+                               +PDF.gaussD (n*p*q) (sqrt (predvar)) mean
+
+likeMPFA1 :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
+likeMPFA1 bgSd meanvars v = 
+    let n = v@>0
         q = v@> 1
         fitNoiseMean = v@>2
         fitNoiseVar = v@>3
@@ -132,6 +154,7 @@ likeMPFA bgSd meanvars v =
     in sum $ flip map (zip meanvars ps) 
            $ \((mean, var), p) -> PDF.gaussD (n*p*q) (fitNoiseMean) mean
                                 + PDF.gaussD (n*p*(1-p)*q*q) (fitNoiseVar) var
+
 
 --map (\x-> x*x) $ map (\(mu,var)-> fitfun (n,q) mu - var) $ meanvars
 

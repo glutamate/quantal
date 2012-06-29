@@ -125,7 +125,7 @@ simulateAll nss ntrs = do
 
 simulate4 sess (nstarst:nsims:_)  = 
   forM_ [0..(read nsims-1)] $ \i -> do
-    simulate (sess++show (i+read nstarst)) ["50", "1000"]
+    simulate (sess++show (i+read nstarst)) ["200", "2000"]
   
 
 simulate sess rest = runRIO $ do
@@ -292,18 +292,27 @@ measNPQ sess = runRIO $ do
  
 --  io $ putStr "init ="
 --  io $ print $ initialV
- 
+
+  io $ putStr "globalsd ="
+  io $ print $ globalSd 
+
+  io $ putStr "C 50 1 ="
+  io $ print $ (choose 50 25 ,binomialProb 50 0.1 40, exp $ binomialLogProb 50 0.1 40)
 
   let fastPDF n v = posteriorNPQV amps pcurve globalSd $ L.join [ L.fromList [realToFrac n],  v]-- set n
       startN = getStartN sess
 
-  let npq@(maxV, maxN, _, smplx) = fastNPQ fastPDF  startN $  L.fromList [-10,0.5,-3.7]
+--  let npq@(maxV, maxN, _, smplx) = fastNPQ fastPDF  70 $  L.fromList [-10,0.5,-3.7]
+  let npq@(maxV, maxN, _, smplx) = fastNPQup fastPDF  35 $  L.fromList [-10,0.5,-3.7]
 
   
   let maxFullV = L.join [ L.fromList [realToFrac maxN], maxV]
 
+  io $ print $ maxFullV
  
   io $ print $ posteriorNPQV amps pcurve globalSd $ maxFullV
+
+  --fail "boo!"
 
   let nsam = 100000
       nfrozen = 1000000

@@ -81,10 +81,10 @@ binGauss ns p q cv bgSd = do
      nr  <- binomial ns p
      gaussD (realToFrac nr * q) (sqrt $ q*cv*q*cv*realToFrac nr + bgSd*bgSd)
 
-binGaussFull ns p q cv bgSd = do
+{-binGaussFull ns p q cv bgSd = do
      nr  <- binomial ns p
      siteAmps <- forM [0..(nr-1)] $ const $ gaussD q (q*cv)
-     gaussD (sum siteAmps) (bgSd)
+     gaussD (sum siteAmps) (bgSd)-}
 
 {-binGaussLogPdf ns p q cv bgSd v 
    = log $ bigSum 0 ns $ \nr -> exp $ (normalLogPdf (realToFrac nr * q) (varToTau $ q*cv*q*cv*realToFrac nr + bgSd*bgSd) v) +  (binomialLogProb ns p nr) -}
