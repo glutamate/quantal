@@ -125,7 +125,7 @@ simulateAll nss ntrs = do
 
 simulate4 sess (nstarst:nsims:_)  = 
   forM_ [0..(read nsims-1)] $ \i -> do
-    simulate (sess++show (i+read nstarst)) ["200", "2000"]
+    simulate (sess++show (i+read nstarst)) ["100", "2000"]
   
 
 simulate sess rest = runRIO $ do

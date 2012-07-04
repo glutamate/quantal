@@ -124,7 +124,7 @@ main = do
 
   {-puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
-  pcts <- forM [0..1] $ \i -> do
+  pcts <- forM [0..40] $ \i -> do
 --       putStrLn 
        vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 100 . read) $ readFile ("f7sm"++show i++"/npq_samples")
        let ns = map (minus1 . (@>0)) vsams
@@ -140,11 +140,25 @@ main = do
   plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts
   --print $ percentile' 0.3 [0.0, 0.001..1]
 
+  let 
+
+  plotIt "finalTop" $ ((AxisLabels "time (s)" "Vm (mV)" $ concat[take 5 sigs, take 5 $ reverse sigs]) :||:
+                      (AxisLabels "time (s)" "EPSP amplitude (mV)" tsamps)) :==: 
+                      ((AxisLabels "N" "P" (zip ns ps)) :||:
+                        (AxisLabels "N" "Q (mV?)") (zip ns qs))
+
+  plotIt "finalBot" $ (AxisLabels "Q" "P" (zip qs ps) :||: AxisLabels "Variance" "Mean" mnvars) :==: 
+                      ((AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map fst3 pcts) :||: 
+                       (ManySup $ map ( fst . trd3)  pcts))
+
+
   puts "\\end{document}"
   hClose h
 
   system $ "pdflatex Figure5.tex"
   return ()
+
+
 
 minus1 x = x+1
 

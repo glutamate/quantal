@@ -95,14 +95,14 @@ main = do
   let lowplot = plot3h (plotIx 0 0 1) (plotIx 1 0 1) (plotIx 2 0 1) -}
 
   let mkFakeSigs npars fnm =  do
-             vsamples' <- lift $ fmap (read) $ readFile fnm
+             vsamples' <- lift $ fmap ( thin 10 .read) $ readFile fnm
              vsample <- fmap ( L.toList ) $ sample $ oneOf vsamples'
              let vsample1 = if npars == 4 then take 2 vsample ++ [(vsample!!2)-2, vsample!!3] else vsample
              let cholm = L.chol $ mkCovM (np+1) $ take npars $ vsample1
              sample $ sequence $ replicate 10 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
     
 
-  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 20 $ do
+  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 100 $ do
                          sigs <-  mkFakeSigs npars fnm                          
                          return (avSigs $ map autoCorrSig $ sigs, map sigSpan sigs) 
 
@@ -148,21 +148,23 @@ main = do
   puts $ "sigspan model3 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr3) ++"\n\n"
   --puts $ "sigspan model4 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr4) ++"\n\n"
 
-  let spanhists = ("1", Histo 10 (map (runStat meanF . snd) fakeautocorr1)) :+:
-                       ("2", Histo 10 (map (runStat meanF . snd) fakeautocorr2)) :+:
-                       ("3", Histo 10 (map (runStat meanF . snd) fakeautocorr3)) :+:
-                       ("4", Histo 10 (map (runStat meanF . snd) fakeautocorr4)) 
+  let spanhists = ("1", Histo 20 (map (runStat meanF . snd) fakeautocorr1)) :+:
+                       ("2", Histo 20 (map (runStat meanF . snd) fakeautocorr2)) :+:
+                       ("3", Histo 20 (map (runStat meanF . snd) fakeautocorr3)) :+:
+                       ("4", Histo 20 (map (runStat meanF . snd) fakeautocorr4)) 
 
 
   scatters <- fmap (unzip3) $ forM datasess $ \dsess -> do
      vsams3::[L.Vector Double] <-  readFile' (take 6 dsess++"/noise_samples3")
      vsams2::[L.Vector Double] <-  readFile' (take 6 dsess++"/noise_samples2")
-     return ((dsess, zip (map (@>0) vsams2) (map (exp . (@>1)) vsams2)), (dsess, zip (map (@>0) vsams3) (map (exp . (@>1)) vsams3)), (dsess, zip (map (exp . (@>2)) vsams3) (map (exp . (@>1)) vsams3)))
+     return (( zip (map (@>0) vsams2) (map (exp . (@>1)) vsams2)), 
+             (dsess, zip (map (@>0) vsams3) (map (exp . (@>1)) vsams3)), 
+             (zip (map (exp . (@>2)) vsams3) (map (exp . (@>1)) vsams3)))
      
   --plotIt "scatpars2" $ ManySup $ fst3 scatters
   --plotIt "scatpars3" $ ManySup $ snd3 scatters
   --plotIt "scatpars4" $ ManySup $ trd3 scatters
-
+  {- 0: sigma, 1: logtheta, 2: logobs -}
 
   --let datareal = realNoise
   let triplot a b c = 33% a :|: 67%(b :||: c)
@@ -173,7 +175,10 @@ main = do
   let botPlot = spanhists :||: mkAutoCorrPlot fakeautocorr3
 
   plotIt "finalFigure1" $ (realNoise :||: fakesigs1) :==: (fakesigs2 :||: fakesigs3)
-  plotIt "finalFigure2" $ ((ManySup $ fst3 scatters ) :||: (ManySup $ snd3 scatters)) :==: ((ManySup $ trd3 scatters):||: (spanhists :==: mkAutoCorrPlot fakeautocorr3))
+  plotIt "finalFigure2" $ ((YRange 0 500 $ XRange 1 7 $ ManySup $ fst3 scatters ) :||: 
+                           (YRange 0 500 $ XRange 1 7 $ ManySup $ snd3 scatters)) :==: 
+                          ((YRange 0 500 $ ManySup $ trd3 scatters) :||: 
+                          (spanhists :==: mkAutoCorrPlot fakeautocorr3))
 
   puts "\\end{document}"
   hClose h
@@ -186,7 +191,7 @@ main = do
 readFile' fnm = do
   ex <- doesFileExist fnm
   if ex 
-     then fmap (read) $ readFile fnm
+     then fmap ( thin 10 .read) $ readFile fnm
      else return []
 
 sigSpan :: Signal Double -> Double

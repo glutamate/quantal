@@ -64,17 +64,17 @@ main = do
   return ()
 
 plotSamPdf nm h sam pdf = do
-  amps <- sampleNIO 200000 $ sam
+  amps <- sampleNIO 2000000 $ sam
   let lo = foldl1' min amps
       hi = foldl1' max amps
-      dx = (hi-lo)/400
-      scale = (hi-lo)/200 -- not quite right bec histo goes less than spread o
+      dx = (hi-lo)/800
+      scale = (hi-lo)/400 -- not quite right bec histo goes less than spread o
       xs = [lo,lo+dx..hi]
   let plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
                          hPutStrLn h $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
   
-  plotIt nm $ Histo 100 amps :+: (zip xs $ map ((*scale) . pdf) xs)
+  plotIt nm $ XRange (-0.1) 1 $ HistoStyle "histeps" 200 amps :+: (zip xs $ map ((*scale) . pdf) xs)
 
 
 binGauss ns p q cv bgSd = do
