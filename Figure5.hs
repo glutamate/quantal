@@ -148,8 +148,7 @@ main = do
                         (AxisLabels "N" "Q (mV?)") (zip ns qs))
 
   plotIt "finalBot" $ (AxisLabels "Q" "P" (zip qs ps) :||: AxisLabels "Variance" "Mean" mnvars) :==: 
-                      ((AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map fst3 pcts) :||: 
-                       (ManySup $ map ( fst . trd3)  pcts))
+                      ((ManySup $ map ( fst . trd3)  pcts) :||: (AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map fst3 pcts))
 
 
   puts "\\end{document}"

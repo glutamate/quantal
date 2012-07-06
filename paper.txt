@@ -87,4 +87,93 @@ experimentally observed voltage traces.
 
 * quantify variance (lowess-corrected) across cells
 
+Quantal Analysis as Bayesian Inference. 
 
+ABSTRACT
+
+Quantal analysis of synaptic recordings can be used to determine the
+locus of changing synaptic strength due to synaptic plasticity. The
+state-fo-the art method for determining quantal parameters,
+mean-variance analysis, was developed in brain slice proparations
+where signal-to-noise ratios were large and it is possible to change
+extracellular calcium on a rapid timescale. In many preparations,
+including a locust visuo-motor interneuron, these conditions do not
+hold. Here, we present an improved method for quantal analysis based
+on a probablistic model for the raw synaptic recordings. We show that
+a model of the membrane potential noise must consider both process and
+observation noise, and that EPSP amplitudes measured as parameter
+estimates in such a model are more accurately observed than using
+standard methods or using models that lack either of these two noise
+components. We show quantal parameters can in principle be
+directly estimated from these amplitudes with Bayesian inference using
+Markov-chain monte carlo. We then give the results from a Bayesian
+quantal analysis of two datasets. ..
+
+
+FIGURE LEGENDS
+
+1. Locust DCMD-FETi EPSPs recorded during varying extracellular
+calcium concentrations do not show a parabolic mean-variance
+relationship. A, EPSPs recorded from FETi neurons aligned to action
+potentials recorded from DMCD nerve recordings, with individual
+recordings (red) superimposed by an average potential (black). B, EPSP
+amplitudes measures during varying extracellular
+Ca2+. C and D, Mean-variance curve for calculated with chunk sizes of
+100 EPSPs (C) and 500 EPSPs (D).
+
+To do: check Mean-var has ben calculated with detrended means.
+-a: APs?
+-b: low Ca bars?
+
+2. Probabilistic models of intracellular recordings need to take into
+account both mean-reverting process noise and observation noise. A,
+Recorded baseline membrane potential traces. B, Membrane potential
+traces from a model that has only observation noise, simulated using
+parameters estimated for that model from the recorded data. C, As B,
+but using a model that has only mean-reverting (Ornstein-Uhlenbeck)
+process noise. D, As B, with a model that has both mean-reverting
+process and observation noise. E, parameter estimates for models with
+only process (Ei) and both process and observation (Eii and Eiii) for
+different cells. Ei and Eii show parameter estimates for comparable
+parameters (theta vs sigma) in models with and without observation
+noise. Fi, Posterior predictive check based on the span (subtraction
+of low point from high point potential values during 100ms) for models
+with observation, process and both observation and process noise. Fii,
+Posterior predictive check using the membrane potential
+autocorrelation simulated with estimated parameters (red) and observed
+autocorrelation (black). 
+
+3. Individual EPSP amplitude are most accurately measured through a
+probabilistic model that incorporates process and observation
+noise. A, Time-course of EPSP amplitudes measured by subtracting the
+average during a baseline period from the average potential during a
+3ms window placed at the peak of the EPSP waveform. B-D, EPSP
+amplitudes measured with (maximum likelihood) statistical parameter
+estimation in models with different noise components. B, using a model
+with only observation noise. C, Using only mean-reverting process
+noise. D, using both process and observation noise. E, Variance of
+EPSP amplitudes, detrended to remove variance due to slow changes in
+EPSP amlitude caused by changes in extracellular calcium, using
+different the measurement methodologies in A-D. 
+
+4. The amplitude of an EPSP, based on a quantal release model, cannot
+be assigned a finite probability density unless measurement error is
+incorporated in the model. A, Red, histogram of quantal
+events simulated with N=10, Q=0.1, P = ?. The long bar located at Q=0
+inidicates failures of all release sites. B, Histogram of quantal
+events simulated as above, but with an additional measurement error of
+EPSP amplitudes (red) Green, probability density function from Eq (X).  
+
+5. A Bayesian model of quantal synaptic transmission can reliably
+estimate quantal parameters from synthetic data simulated with N=50
+and P_{max}= 0.8. A, simulated membrane potentials (i) and EPSP
+amplitudes measured as in 4D (ii). B, posterior samples (parameter
+estimates) from a Markov-chain monte carlo run. (i) N against P, (ii)
+(Q against N) and (iii) P against Q. C, Mean-variance curve from the
+same data set. D, To validate the inference, the data simulation -
+parameter estimation procedure was repeated 40 times. Posterior
+histograms for N (i) and the cumulative distribution of quantiles of
+the parameter value used to generate the data (50) within the
+parameter estimates.
+
+6. Estimates of the DCMD-FETi quantal synaptic parameters.
