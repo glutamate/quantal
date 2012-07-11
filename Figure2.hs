@@ -102,7 +102,7 @@ main = do
              sample $ sequence $ replicate 10 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
     
 
-  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 100 $ do
+  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 4 $ do
                          sigs <-  mkFakeSigs npars fnm                          
                          return (avSigs $ map autoCorrSig $ sigs, map sigSpan sigs) 
 
@@ -174,11 +174,11 @@ main = do
   let midRow = triplot (ManySup $ fst3 scatters ) (ManySup $ snd3 scatters) (ManySup $ trd3 scatters)
   let botPlot = spanhists :||: mkAutoCorrPlot fakeautocorr3
 
-  plotIt "finalFigure1" $ (realNoise :||: fakesigs1) :==: (fakesigs2 :||: fakesigs3)
-  plotIt "finalFigure2" $ ((YRange 0 500 $ XRange 1 7 $ ManySup $ fst3 scatters ) :||: 
-                           (YRange 0 500 $ XRange 1 7 $ ManySup $ snd3 scatters)) :==: 
-                          ((YRange 0 500 $ ManySup $ trd3 scatters) :||: 
-                          (spanhists :==: mkAutoCorrPlot fakeautocorr3))
+  plotIt "finalFigure1" $ (A realNoise :||: B fakesigs1) :==: (C fakesigs2 :||: D fakesigs3)
+  plotIt "finalFigure2" $ ((Ei $ YRange 0 500 $ XRange 1 7 $ ManySup $ fst3 scatters ) :||: 
+                           (Eii $ YRange 0 500 $ XRange 1 7 $ ManySup $ snd3 scatters)) :==: 
+                          ((Eiii $ YRange 0 500 $ ManySup $ trd3 scatters) :||: 
+                          (Fi spanhists :==: Fii (mkAutoCorrPlot fakeautocorr3)))
 
   puts "\\end{document}"
   hClose h

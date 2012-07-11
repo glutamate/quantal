@@ -118,7 +118,7 @@ binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((nor
 
 binGaussLogPdf :: Int -> Double -> Double -> Double -> Double -> Double -> Double 
 binGaussLogPdf ns p q cv  bgSd v = 
-   bigLogExpSum 0 ns $ \nr-> 
+   (\x->x-log 2.221439) $ bigLogExpSum 0 ns $ \nr-> 
        normalLogPdf ((realToFrac nr)*q) (varToTau$ f1*(realToFrac nr)+f2) v
      + binomialLogProb ns p nr
  where f1 = q*cv*q*cv
@@ -303,6 +303,26 @@ initAdaMetFromCov nsam pdf initv retries cov = do
      _ | rate < 0.15 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.3 cov 
      _ | rate < 0.19 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.5 cov 
      _ | rate < 0.24 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.8 cov 
+     _ | otherwise -> do io $ putStrLn "initals ok." 
+                         return iniampar
+  
+initAdaMetFromCovNPQ nsam pdf initv retries cov = do
+  io $ putStrLn $ "starting from existing cov; try number "++ show retries
+  iniampar <- sample $ initialAdaMetFromCov nsam (pdf) initv
+                                                 (PDF.posdefify $ cov) 
+  io $ print iniampar
+  let rate = realToFrac (count_accept iniampar) / realToFrac nsam
+  case () of
+     _ | retries > 8 -> do io $ putStrLn "initals ok." 
+                           return iniampar
+     _ | rate > 0.4 -> initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 2 cov 
+     _ | rate > 0.25 -> initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 1.5 cov 
+
+     _ | rate < 0.01 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.1 cov 
+     _ | rate < 0.05 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.2 cov 
+     _ | rate < 0.075 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.3 cov 
+     _ | rate < 0.10 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.5 cov 
+     _ | rate < 0.14 ->  initAdaMetFromCov nsam pdf initv (retries +1) $ L.scale 0.8 cov 
      _ | otherwise -> do io $ putStrLn "initals ok." 
                          return iniampar
   
@@ -546,7 +566,7 @@ getSess def = do
 
 datasess = 
  --words "00c9bd 0ca3a9 84b41c 22b152 512f48 7b8f60 b34863 b62b8f cf96ab fcb952 57246a"
- words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 fcb952 b34863 cf96ab b62b8f"  -- fcb952 b62b8f
+ words "00c9bd 0ca3a9 84b41c 57246a 22b152 512f48 7b8f60 fcb952 b34863 cf96ab" -- b62b8f"  -- fcb952 b62b8f
 
 burnIn = [("22b", 8000), ("b62", 6000), ("cf96", 4000), 
           ("b34", 3000), ("00c9",10000), ("84", 15000), ("572", 13000)]

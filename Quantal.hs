@@ -314,7 +314,7 @@ measNPQ sess = runRIO $ do
 
   --fail "boo!"
 
-  let nsam = 100000
+  let nsam    = 100000
       nfrozen = 1000000
 
 
@@ -326,10 +326,10 @@ measNPQ sess = runRIO $ do
   io $ putStr "frozenpar ="
   io $ print $ froampar
   
-  iniampar1 <- initAdaMetFromCov 20000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
+  iniampar1 <- initAdaMetFromCovNPQ 20000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
-  vsamples <- runAdaMetRIO nsam True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
+  vsamples <- runAdaMetRIO nfrozen True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
 
   io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 

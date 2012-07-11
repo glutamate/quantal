@@ -51,11 +51,17 @@ main = do
      "\\begin{document}",
      "\n"]
 
-  plotSamPdf "hist1" h (binGaussFull 10 0.2 0.1 0.2 0.0) (binGaussPdfFrom1 10 0.2 0.1 0.2 0.0)
+  let nrel = 10
+      prel = 0.2
+      q    = 0.1
+      cv = 0.2
+      bgSd = 0.01
 
+  hist1 <- plotSamPdf  (binGaussFull 10 0.2 0.1 0.2 0.0) (binGaussPdfFrom1 10 0.2 0.1 0.2 0.0)
 
-  plotSamPdf "hist2" h (binGaussFull 10 0.2 0.1 0.2 0.01) (binGaussPdf 10 0.2 0.1 0.2 0.01)
+  hist2 <- plotSamPdf  (binGaussFull nrel prel q cv bgSd) (exp . binGaussLogPdf nrel prel q cv bgSd)
 
+  plotIt "fig3" $ (XRange (-0.1) 0.6 $ A  hist1 :==: B hist2) 
 
   puts "\\end{document}"
   hClose h
@@ -63,18 +69,15 @@ main = do
   system $ "pdflatex Figure4.tex"
   return ()
 
-plotSamPdf nm h sam pdf = do
+plotSamPdf sam pdf = do
   amps <- sampleNIO 2000000 $ sam
   let lo = foldl1' min amps
       hi = foldl1' max amps
-      dx = (hi-lo)/800
-      scale = (hi-lo)/400 -- not quite right bec histo goes less than spread o
+      dx = (hi-lo)/1000
+      --scale = (hi-lo)/400 -- not quite right bec histo goes less than spread o
       xs = [lo,lo+dx..hi]
-  let plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
-                         system $ "epstopdf "++nm++".eps"
-                         hPutStrLn h $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
-  
-  plotIt nm $ XRange (-0.1) 1 $ HistoStyle "histeps" 200 amps :+: (zip xs $ map ((*scale) . pdf) xs)
+  let empInt=  sum $ map (*dx) $ map pdf xs
+  return $ HistoStyle "histeps" 200 amps :+: (zip xs $ map ((/empInt) . pdf) xs)
 
 
 binGauss ns p q cv bgSd = do

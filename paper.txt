@@ -106,8 +106,7 @@ estimates in such a model are more accurately observed than using
 standard methods or using models that lack either of these two noise
 components. We show quantal parameters can in principle be
 directly estimated from these amplitudes with Bayesian inference using
-Markov-chain monte carlo. We then give the results from a Bayesian
-quantal analysis of two datasets. ..
+Markov-chain monte carlo. We then measure quantal parameters from recordings..
 
 
 FIGURE LEGENDS
@@ -121,8 +120,8 @@ amplitudes measures during varying extracellular
 Ca2+. C and D, Mean-variance curve for calculated with chunk sizes of
 100 EPSPs (C) and 500 EPSPs (D).
 
-To do: check Mean-var has ben calculated with detrended means.
--a: APs?
+To do: check Mean-var has been calculated with detrended means.
+-a: add APs?
 -b: low Ca bars?
 
 2. Probabilistic models of intracellular recordings need to take into
@@ -142,6 +141,8 @@ with observation, process and both observation and process noise. Fii,
 Posterior predictive check using the membrane potential
 autocorrelation simulated with estimated parameters (red) and observed
 autocorrelation (black). 
+
+to do: colour according to sol/greg. Axis labels. Ticks. Labels
 
 3. Individual EPSP amplitude are most accurately measured through a
 probabilistic model that incorporates process and observation
@@ -176,4 +177,10 @@ histograms for N (i) and the cumulative distribution of quantiles of
 the parameter value used to generate the data (50) within the
 parameter estimates.
 
-6. Estimates of the DCMD-FETi quantal synaptic parameters.
+6. Estimates of the DCMD-FETi quantal synaptic parameters. A,
+Estimates of the number of release sites (N) in solitarious (top) and
+gregarious (bottom) animals. B, Estimates of the release probability
+under baseline (4 mM Ca2+) conditions in solitarious and gregarious
+animals. C, Estimates of the quantal size (Q) in solitarious (top) and
+gregarious (bottom) animals.
+

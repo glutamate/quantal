@@ -48,7 +48,7 @@ getMPFA nseg globalSd tsamps =
 
 
 main = do
-  sess <- getSess "f7sm20"
+  sess <- getSess "f7sm19"
 
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
@@ -81,11 +81,11 @@ main = do
       pcurve = map (/(maxPcurve)) weighCurve'
   let globalSd = runStat  meanF sds
 
-  plotIt "pcurve" $ zip t0s pcurve :+: tsamps
+  --plotIt "pcurve" $ zip t0s pcurve :+: tsamps
 
-  plotIt "wf" wf
+  --plotIt "wf" wf
 
-  plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
+  --plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
 
   vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
 
@@ -96,7 +96,7 @@ main = do
   let ns = map (roundD . (@>0)) vsamples
       ps = map (@>2) vsamples
       qs = map ((*wfAmp) . exp . (@>3)) vsamples
-  plotIt "nplot" $ zip [(0::Double)..] $ ns
+  {-plotIt "nplot" $ zip [(0::Double)..] $ ns
   plotIt "pplot" $ zip [(0::Double)..] $ ps
   plotIt "qplot" $ zip [(0::Double)..] $ qs
 
@@ -106,21 +106,21 @@ main = do
 
   plotIt "npcor" $ zip ns ps
   plotIt "nqcor" $ zip ns qs
-  plotIt "pqcor" $ zip qs ps
+  plotIt "pqcor" $ zip qs ps -}
 
   let mnvars = mpfa 200 tsamps
 
-  plotIt "mpfa" $ mnvars
+  --plotIt "mpfa" $ mnvars
 
   let inimpfa = L.fromList $ [100, log 0.04, log 0.1, log 0.1]
   let laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.001} 
                                       (likeMPFA globalSd mnvars) [] [] 
                                       $ inimpfa
 
-  puts $ "likeMPFA init="++show (likeMPFA globalSd mnvars inimpfa)
-  puts $ "likeMPFA final="++show (likeMPFA globalSd mnvars mn1)
+  --puts $ "likeMPFA init="++show (likeMPFA globalSd mnvars inimpfa)
+  --puts $ "likeMPFA final="++show (likeMPFA globalSd mnvars mn1)
 
-  puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
+  --puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
 
   {-puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
@@ -134,10 +134,10 @@ main = do
        return $ (pct, percentile' 0.8 phis, (HistoStyle "histeps" 25 $ ns, HistoStyle "histeps" 25 $ phis))
        --return $ HistoStyle "histeps" 25 $ ns 
 
-  plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst3 pcts
+  {-plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst3 pcts
   plotIt "cookp" $ zip [(0::Double)..] $ sort $ map snd3 pcts
   plotIt "cookhn" $ ManySup $ map ( fst . trd3)  pcts
-  plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts
+  plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts -}
   --print $ percentile' 0.3 [0.0, 0.001..1]
 
   let 

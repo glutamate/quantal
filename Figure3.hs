@@ -13,7 +13,7 @@ import Control.Monad
 import System.Directory
 import "probably" Math.Probably.RandIO
 import QuantalHelp
-import "baysig" Baysig.Estimate.RTS
+import "baysig" Baysig.Estimate.RTS hiding (repeat)
 import Data.Binary
 import qualified Numeric.LinearAlgebra as L
 import "probably" Math.Probably.MCMC
@@ -71,7 +71,7 @@ main = do
   let sess = "22b152"
   h <- openFile ("Figure3.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
-      plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
+      plotIt nm obj = do gnuplotToPSOpts (nm++".eps") [SizeSpec "5.0,5.5"] $ obj
                          system $ "epstopdf "++nm++".eps"
                          puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
  
@@ -111,8 +111,8 @@ main = do
 
   let rngIt x = Points [PointType 7] $ XRange 10 4000 $ YRange (-0.3) 1.6 x
 
-  plotIt "pcurve1" $ (YLabel "Estimated amplitude (mV)" $ ("Window", rngIt measPts)) :||: (YTics [] $ ("Least squares", rngIt tsamps1))
-        :==: ((YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (YTics [] $ ("OU + obs", rngIt tsamps3)))
+  let topQuad = (A $ YLabel "Estimated amplitude (mV)" $ ("Window", rngIt measPts)) :||: (B $ YTics [] $ ("Least squares", rngIt tsamps1))
+        :==: ((C $ YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (D $ YTics [] $ ("OU + obs", rngIt tsamps3)))
 
  
 --  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
@@ -139,7 +139,7 @@ main = do
 
 --  puts $ show (var1, var2)
 
-  var12 <- forM datasess $ \sess1 -> do
+  var12 <- forM (datasess) $ \sess1 -> do
      vars <- varDiff sess1
      --puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
      return vars 
@@ -147,11 +147,17 @@ main = do
   let vars = map (runStat meanF) $ transpose $ filter allNonZero var12
 
 
+  puts $ show $ (transpose $ filter allNonZero var12) !! 2
+
+  puts $ show $ runStat meanF $ (transpose $ filter allNonZero var12) !! 2
+
   puts $ show vars
 
-  plotIt "varplot" $ XTicLabel [("Window", 0), ("Least sq",1),("OU",2),("OU+obs",3),("OU+obs+flat",4)] $ YLabel "Variance" $ YRange 0 0.06 $ Boxes $ zip [(0::Double)..] vars
+  let varplot = E $ XTicLabel [("Window", 0), ("Least sq",1),("OU",2),("OU+obs",3)] $ YLabel "Variance" $ (Boxes $ zip [(0::Double)..] vars) :+: (concatMap (\(ix, vars) ->zip (repeat ix) vars ) (zip [(0::Double)..] (transpose $ filter allNonZero var12)))
   --puts $ show $ map fst var12
   --puts $ show $ map snd var12
+
+  plotIt "fig2" $ 66% topQuad :--: 34%varplot
 
   puts "\\end{document}"
   hClose h
@@ -169,7 +175,7 @@ varDiff sess = do
   let measPts = (map (\((t1,t2),v)-> (t1,v)) $ concat meass)::[(Double, Double)]
   let varTrad = runStat meanF $ map (localVar measPts) measPts
 
-  vars <- forM [1..4] $ \npars -> do
+  vars <- forM [1..3] $ \npars -> do
      let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
      ex <- doesFileExist (sess++"/epsps"++show npars)
      if ex
