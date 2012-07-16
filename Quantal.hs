@@ -315,7 +315,7 @@ measNPQ sess = runRIO $ do
   --fail "boo!"
 
   let nsam    = 100000
-      nfrozen = 1000000
+      nfrozen = 5000000
 
 
   iniampar <- sample $ initialAdaMet 5000 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
@@ -329,13 +329,13 @@ measNPQ sess = runRIO $ do
   iniampar1 <- initAdaMetFromCovNPQ 20000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
-  vsamples <- runAdaMetRIO nfrozen True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
+  runAdaMetRIOtoFile nfrozen 10 (take 6 sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
 
-  io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
+{-  io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
   io $ putStrLn $ intercalate "\t" $ map (minWidth 8) $ words "n cv phi q"
   io $ putStrLn $ showNPQV $ mean
-  io $ putStrLn $ showNPQV sd  
+  io $ putStrLn $ showNPQV sd  -}
   return ()
 
   {-let nsam = 40000

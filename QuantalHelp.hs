@@ -337,14 +337,14 @@ posteriorSigV wf invDetails sig v
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
 -- oneToLogPdf (800) n
  {-normalLogPdf (-1.9) 100 (log cv) -} uniformLogPdf 0 0.5 cv
- +uniformLogPdf (0) (1) phi
+-- +uniformLogPdf (0) (1) phi
 -- +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->
                let p=pcurveVal * phi 
                in binGaussLogPdf (n) (p) (q) (cv) (sd) amp)
   where n = round $ v @> 0
         cv = exp $ v @> 1
-        phi = v @> 2
+        phi = 1/(1+exp(-(v @> 2)))
         q = exp $ v @> 3
 
 type Vec = L.Vector Double

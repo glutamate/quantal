@@ -1,3 +1,17 @@
+## Introduction
+
+Quantal analysis is the central measuremernt problem of synaptic
+physiology. By using fluctuations in measred EPSP strengths
+.. elucidate what: locus of chaneg. structure of synapse. multiquyantal release. 
+
+How: state of the art. Requirements. 
+
+slow change. Humeau idea. 
+
+Locust phase change. motivate investigation.
+
+here: fail!
+
 ## Results
 
 In order to determine the locus of phenotypic synaptic plasticity, we
