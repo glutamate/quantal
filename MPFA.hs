@@ -14,6 +14,9 @@ import Numeric.LinearAlgebra
 import qualified Math.Probably.PDF as PDF
 import Control.Monad
 import System.IO.Unsafe
+
+import Debug.Trace
+
 epsp :: Double -> Sampler Double
 epsp p = do 
   let n =100::Int
@@ -135,9 +138,9 @@ likeMPFA bgSd meanvars v =
         
     in sum $ flip map (meanvars ) 
            $ \(mean, var) -> let p = mean/imax
-                                 predvar = n*p*(1-p)*q*q+bgSd*bgSd
-                             in PDF.gaussD (predvar) (varvar) var
-                               +PDF.gaussD (n*p*q) (sqrt (predvar)) mean
+                                 predvar = n*p*(1-p)*q*q*(1+0.15*0.15)+bgSd*bgSd
+                             in  PDF.gaussD (predvar) (varvar) var
+                                 +PDF.gaussD (n*p*q) (sqrt (predvar)) mean
 
 likeMPFA1 :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
 likeMPFA1 bgSd meanvars v = 

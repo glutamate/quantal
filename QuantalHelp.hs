@@ -55,16 +55,16 @@ oneTo = \n-> (uniform 0.500 ((realToFrac n)+0.500))>>=(\x-> return (round x))
 oneToLogPdf = \hi-> \x-> if ((x<(hi+1))&&(x>0)) then 1.000 else (0.000-1.000e50)
 normal = \mean-> \tau-> unormal>>=(\u-> return ((u/(sqrt (tau*2.000)))+mean))
 normalSd = \mean-> \sd-> unormal>>=(\u-> return ((u*sd)+mean))
-normalPdf = \mu-> \tau-> \x-> (sqrt ((tau/2.000)*pi))*(exp (0.000-(((x-mu)*(x-mu))*tau)))
+normalPdf = \mu-> \tau-> \x-> (sqrt (tau/(2.000*pi)))*(exp (0.000-(((x-mu)*(x-mu))*tau/2)))
 
 normalLogPdf :: Double -> Double -> Double -> Double
-normalLogPdf = \mu-> \tau-> \x-> (log (sqrt ((tau/2.000)*pi)))+(0.000-(((x-mu)*(x-mu))*tau))
+normalLogPdf = \mu-> \tau-> \x-> (log (sqrt (tau/(2.000*pi))))+(0.000-(((x-mu)*(x-mu))*tau/2))
 
-sdToTau = \sd-> 1.000/((2.000*sd)*sd)
-meanCVToTau = \mn-> \cv-> 1.000/((2.000*(cv*mn))*(cv*mn))
+--sdToTau = \sd-> 1.000/((2.000*sd)*sd)
+--meanCVToTau = \mn-> \cv-> 1.000/((2.000*(cv*mn))*(cv*mn))
 varToTau :: Double -> Double
-varToTau = \var-> recip $ 2*var
-tauToSD = \t-> 1.000/(sqrt (t*2.000))
+varToTau = \var-> recip $ var
+--tauToSD = \t-> 1.000/(sqrt (t*2.000))
 logNormal = \mu-> \tau-> (fmap exp)$(normal mu tau)
 logNormalPdf = \mu-> \tau-> \x-> ((sqrt tau)*(1.000/x))*(exp (0.000-(((tau*((log x)-mu))*((log x)-mu))/2.000)))
 binNormalApprox = \n-> \p-> normal (n*p) (varToTau ((n*p)*(1.000-p)))
@@ -118,7 +118,7 @@ binGaussPdfFrom1 = \ns-> \p-> \q-> \cv-> \bgSd-> \v-> (bigSum 1 ns)$(\nr-> ((nor
 
 binGaussLogPdf :: Int -> Double -> Double -> Double -> Double -> Double -> Double 
 binGaussLogPdf ns p q cv  bgSd v = 
-   (\x->x-log 2.221439) $ bigLogExpSum 0 ns $ \nr-> 
+   bigLogExpSum 0 ns $ \nr-> 
        normalLogPdf ((realToFrac nr)*q) (varToTau$ f1*(realToFrac nr)+f2) v
      + binomialLogProb ns p nr
  where f1 = q*cv*q*cv
@@ -136,7 +136,7 @@ betaInit = \a-> \b-> a/(a+b)
 alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOUOld = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
-dt = 5.000e-5 -- 0.0002 -- 5.000e-5
+dt = 1.000e-4 -- 0.0002 -- 5.000e-5
 tmax = 0.1 --0.2
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
@@ -336,7 +336,7 @@ posteriorSigV wf invDetails sig v
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
 -- oneToLogPdf (800) n
- {-normalLogPdf (-1.9) 100 (log cv) -} uniformLogPdf 0 0.5 cv
+ normalLogPdf (-1.9) 100 (log cv) -- uniformLogPdf 0 0.5 cv
 -- +uniformLogPdf (0) (1) phi
 -- +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->
@@ -507,6 +507,19 @@ fakesam simn ntrials = return 0.150>>=(\cv->
                           (\t-> vstart+(amp*(((((step (t-simt0))*tc)*tc)*(t-simt0))*(exp ((0.000-(t-simt0))*tc)))))) 
                           cholm))))))))
   where cholm = chol $ mkCovM (np+1) hatPars
+        soffset = ntrials / 2
+        sslope = 8.000e-3 * (1000/ntrials) 
+
+
+fakesamP simn ntrials = return 0.150>>=(\cv-> 
+        (return 0.800)>>=(\phi-> 
+        (return 0.200)>>=(\plo-> 
+        (return (simq*(100/realToFrac simn)))>>=(\q-> 
+        (return 170.000)>>=(\tc-> 
+        (for 1 ntrials)$(\i-> 
+            let p = phi-((phi-plo)/(1.000+(exp (soffset*sslope-sslope*realToFrac i)))) 
+            in return p))))))
+  where 
         soffset = ntrials / 2
         sslope = 8.000e-3 * (1000/ntrials) 
 
