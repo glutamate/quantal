@@ -125,7 +125,7 @@ simulateAll nss ntrs = do
 
 simulate4 sess (nstarst:nsims:_)  = 
   forM_ [0..(read nsims-1)] $ \i -> do
-    simulate (sess++show (i+read nstarst)) ["100", "2000"]
+    simulate (sess++show (i+read nstarst)) ["50", "2000"]
   
 
 simulate sess rest = runRIO $ do
@@ -314,11 +314,11 @@ measNPQ sess = runRIO $ do
 
   --fail "boo!"
 
-  let nsam    = 100000
-      nfrozen = 5000000
+  let nsam    = 15000
+      nfrozen = 1000000
 
 
-  iniampar <- sample $ initialAdaMet 5000 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
+  iniampar <- sample $ initialAdaMet 1000 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
   io $ putStr "inipar ="
   io $ print $ iniampar 
 
@@ -326,7 +326,7 @@ measNPQ sess = runRIO $ do
   io $ putStr "frozenpar ="
   io $ print $ froampar
   
-  iniampar1 <- initAdaMetFromCovNPQ 20000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
+  iniampar1 <- initAdaMetFromCovNPQ 10000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
   runAdaMetRIOtoFile nfrozen 10 (take 6 sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 

@@ -95,6 +95,7 @@ This gave us a direct expression for the likelihood of observing a
 vector v corresponding to the membrane voltage sampled with a fixed
 interval. 
 
+use which data?
 
 Using Bayesian inference based on markov chain monte carlo, we were
 able to estimate parameters theta and sigma from recordings from
@@ -103,7 +104,7 @@ simulating random voltage traces using parameters drawn from these
 estimates (the posterior). We compared these traces to the
 experimentally observed voltage traces. 
 
-* doesn't work
+* doesn't work 
 
 * add independent observation noise - brings sigma down. Can do this
   without latent variables

@@ -42,7 +42,7 @@ dispatch "gen" = gen
 dispatch "pdf" = main1
 
 
-prelease = 0.5
+prelease = 0.6
 nrel = 50
 qreal = simq
 fnm = "/epsps_"++show nrel++"_"++show (round $ prelease*100)++"_"++show (round $ qreal*10000)
@@ -57,7 +57,7 @@ gen = runRIO $ do
        meanVec = (fillV (np))$(\i-> wft (toD i))
        invDetails = invlndet covM1
    h<- io $ openFile (take 6 sess++fnm) WriteMode 
-   forM_ [1..10000] $ \i-> do
+   forM_ [1..2000] $ \i-> do
         amp <- sample $ binGaussFull nrel prelease qreal 0.2 0
         sig <- sample $ gpByChol dt 
                           (\t-> amp*wft t)
@@ -80,10 +80,10 @@ post amps v = sum $ (flip map) amps $ \amp->
   where sd = v@>0
         q = v@> 1
 
-binGaussFull ns p q cv bgSd = do
+{-binGaussFull ns p q cv bgSd = do
      nr  <- binomial ns p
      siteAmps <- forM [0..(nr-1)] $ const $ gaussD q (q*cv)
-     gaussD (sum siteAmps) (bgSd)
+     gaussD (sum siteAmps) (bgSd) -}
 
 
 main1 = do

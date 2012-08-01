@@ -46,9 +46,27 @@ getMPFA nseg globalSd tsamps =
                                       $ inimpfa
   in laprs
 
+ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+
+getMPFAN sess = do
+  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps3")
+  (wf, wfAmp, sigs) <- getWf sess
+
+  let tsamps = filter (getFilter sess) $ zip t0s' $ map (*wfAmp) amps'
+  let mnvars = mpfa 200 tsamps
+  let inimpfa = L.fromList $ [60, log 0.04, log 0.1, 1]
+  let globalSd = runStat  meanF sds
+
+  --fail $ show $ likeMPFA globalSd mnvars inimpfa
+
+  let laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.0001} 
+                                      (likeMPFA globalSd mnvars) [] [] 
+                                      $ inimpfa
+  return $ mn1 @> 0
+
 
 main = do
-  sess <- getSess "f7sm19"
+  sess <- getSess "f5sm10"
 
   h <- openFile ("Figure5.tex") WriteMode 
   let puts s = hPutStrLn  h $ s ++ "\n"
@@ -70,7 +88,7 @@ main = do
 
   --print wfAmp
 
-  let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+  
   (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ readFile (sess++"/epsps3")
   let tsamps = filter (getFilter sess) $ zip t0s' $ map (*wfAmp) amps'
       t0s = map fst tsamps
@@ -87,14 +105,14 @@ main = do
 
   --plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
 
-  vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 10 . read) $ readFile (take 6 sess++"/npq_samples")
+  vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . map L.fromList . catMaybes . map safeRead . lines) $ readFile (take 6 sess++"/npq_samples")
 
   --print $ head vsamples
   --print $ last vsamples
 
 
   let ns = map (roundD . (@>0)) vsamples
-      ps = map (@>2) vsamples
+      ps = map (unlogit . (@>2)) vsamples
       qs = map ((*wfAmp) . exp . (@>3)) vsamples
   {-plotIt "nplot" $ zip [(0::Double)..] $ ns
   plotIt "pplot" $ zip [(0::Double)..] $ ps
@@ -112,26 +130,37 @@ main = do
 
   --plotIt "mpfa" $ mnvars
 
-  let inimpfa = L.fromList $ [100, log 0.04, log 0.1, log 0.1]
-  let laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.001} 
+
+
+  let inimpfa = L.fromList $ [60, log 0.04, log 0.1, 1]
+
+  --fail $ show $ likeMPFA globalSd mnvars inimpfa
+
+  let laprs@(mn1,_,_) = laplaceApprox defaultAM {nmTol = 0.0001} 
                                       (likeMPFA globalSd mnvars) [] [] 
                                       $ inimpfa
 
   --puts $ "likeMPFA init="++show (likeMPFA globalSd mnvars inimpfa)
   --puts $ "likeMPFA final="++show (likeMPFA globalSd mnvars mn1)
 
-  --puts $ "\\begin{verbatim}"++show laprs++"\\end{verbatim}"
+  --puts $ "\\begin{verbatim}"++show mn1++"\\end{verbatim}"
+
+  --fail $ show laprs
 
   {-puts $ "max p = "++ show (foldl1 max $ L.toList $ L.subVector 4 (L.dim mn1 - 4) mn1) -}
 
-  pcts <- forM [0..40] $ \i -> do
---       putStrLn 
-       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . thin 100 . read) $ readFile ("f7sm"++show i++"/npq_samples")
-       let ns = map (minus1 . (@>0)) vsams
-           phis = map (@>2) vsams
+  pcts <- forM [0..59] $ \i -> do
+       putStrLn $ show i
+       vsams::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . map L.fromList . catMaybes . map safeRead . lines) $ readFile ("f6sm"++show i++"/npq_samples")
+       --print $ head vsams
+       --print $ last vsams
+       let ns = map ((@>0)) vsams
+           phis = map (unlogit . (@>2)) vsams
            pct =percentile' 50 ns
        print (pct, percentile' 0.8 phis)
-       return $ (pct, percentile' 0.8 phis, (HistoStyle "histeps" 25 $ ns, HistoStyle "histeps" 25 $ phis))
+       nmpfa <- getMPFAN $ "f6sm"++show i
+       print nmpfa
+       return $ ((pct, nmpfa), percentile' 0.8 phis, (HistoStyle "histeps" 25 $ ns, HistoStyle "histeps" 25 $ phis)) 
        --return $ HistoStyle "histeps" 25 $ ns 
 
   {-plotIt "cookn" $ zip [(0::Double)..] $ sort $ map fst3 pcts
@@ -140,7 +169,7 @@ main = do
   plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts -}
   --print $ percentile' 0.3 [0.0, 0.001..1]
 
-  let 
+  
 
   plotIt "finalTop" $ ((AxisLabels "time (s)" "Vm (mV)" $ concat[take 5 sigs, take 5 $ reverse sigs]) :||:
                       (AxisLabels "time (s)" "EPSP amplitude (mV)" tsamps)) :==: 
@@ -148,16 +177,23 @@ main = do
                         (AxisLabels "N" "Q (mV?)") (zip ns qs))
 
   plotIt "finalBot" $ (AxisLabels "Q" "P" (zip qs ps) :||: AxisLabels "Variance" "Mean" mnvars) :==: 
-                      ((ManySup $ map ( fst . trd3)  pcts) :||: (AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map fst3 pcts))
+                      ((ManySup $ map ( fst . trd3)  pcts) :||: (AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map (fst . fst3) pcts))
 
 
+  plotIt "mpfahist" $ Histo 20 $ filter (<80) $ map (snd . fst3) pcts
+  --psSam <- sampleIO $ fakesamP 50 2000
+  --plotIt "pscurve" $ zip [(0::Double) ..] (psSam::[Double])
   puts "\\end{document}"
   hClose h
 
   system $ "pdflatex Figure5.tex"
   return ()
 
+unlogit x= 1/(1+exp(-x))
 
+safeRead x = case readsPrec 5 x of 
+               [] -> Nothing
+               (x,_):_ -> Just x
 
 minus1 x = x+1
 
