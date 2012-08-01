@@ -1,3 +1,24 @@
+Quantal Analysis as Bayesian Inference. 
+
+ABSTRACT
+
+Quantal analysis of synaptic recordings can be used to determine the
+locus of changing synaptic strength due to synaptic plasticity. The
+state-fo-the art method for determining quantal parameters,
+mean-variance analysis, was developed in brain slice proparations
+where signal-to-noise ratios were large and it is possible to change
+extracellular calcium on a rapid timescale. In many preparations,
+including a locust visuo-motor interneuron, these conditions do not
+hold. Here, we present an improved method for quantal analysis based
+on a probablistic model for the raw synaptic recordings. We show that
+a model of the membrane potential noise must consider both process and
+observation noise, and that EPSP amplitudes measured as parameter
+estimates in such a model are more accurately observed than using
+standard methods or using models that lack either of these two noise
+components. We show quantal parameters can in principle be
+directly estimated from these amplitudes with Bayesian inference using
+Markov-chain monte carlo. We then measure quantal parameters from recordings..
+
 ## Introduction
 
 Quantal analysis is the central measuremernt problem of synaptic
@@ -100,28 +121,6 @@ experimentally observed voltage traces.
 * compare two measurements
 
 * quantify variance (lowess-corrected) across cells
-
-Quantal Analysis as Bayesian Inference. 
-
-ABSTRACT
-
-Quantal analysis of synaptic recordings can be used to determine the
-locus of changing synaptic strength due to synaptic plasticity. The
-state-fo-the art method for determining quantal parameters,
-mean-variance analysis, was developed in brain slice proparations
-where signal-to-noise ratios were large and it is possible to change
-extracellular calcium on a rapid timescale. In many preparations,
-including a locust visuo-motor interneuron, these conditions do not
-hold. Here, we present an improved method for quantal analysis based
-on a probablistic model for the raw synaptic recordings. We show that
-a model of the membrane potential noise must consider both process and
-observation noise, and that EPSP amplitudes measured as parameter
-estimates in such a model are more accurately observed than using
-standard methods or using models that lack either of these two noise
-components. We show quantal parameters can in principle be
-directly estimated from these amplitudes with Bayesian inference using
-Markov-chain monte carlo. We then measure quantal parameters from recordings..
-
 
 FIGURE LEGENDS
 
