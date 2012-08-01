@@ -25,13 +25,80 @@ Quantal analysis is the central measuremernt problem of synaptic
 physiology. By using fluctuations in measred EPSP strengths
 .. elucidate what: locus of chaneg. structure of synapse. multiquyantal release. 
 
+
+[In multi-probability fluctuation
+analysis, we make recordings in several different release probability
+conditions (usually evoked by changing the extracellular calcium and
+magnesium concentrations), in which case there may be sufficient
+information in the EPSP fluctuations to estimate N, p and q. In
+classical MPFA, a fitting procedure is used based on the mean and the
+variance of EPSPs recorded in different but stable conditions. In a
+variant, Humeau et al (1198) use recordings made during slow changes
+of release probabilit. We have shown that these methods are
+insufficient for our recordings.]
+
+
 How: state of the art. Requirements. 
 
 slow change. Humeau idea. 
 
+
+
 Locust phase change. motivate investigation.
 
 here: fail!
+
+## Probabilistic model 
+
+Or model of synaptic potential waveforms is based on the binomial
+model for synaptic release (Katz; Silver?). We assume that a synaptic
+connection consists of N functional release sites, which upon arrival
+of the action potential each release a packet of neurotransmitter with
+a probability p, which depends on the extracellular calcium
+concentration.  Each released packet induces in the postsynaptic cell
+a conductance waveform q(t) scaled by a random number sampled from the
+distribution N(1,CVi^2). This unitary waveform is assumed to be
+independent of the extracellular calcium concentration. For n
+successive trials with a fixed release probability p, the EPSP
+amplitudes without observation noise are thus distributed as:
+
+for 1..n 
+  nr ~ B(p,n)
+  A ~ N(nr*q, ...)
+
+where B is the binomial distribution. The conductance amplitude A is
+only indirectly observed through the postsynaptic potential
+waveform. To give a realistic model for this potential waveform, we
+consider the cell as an RC circuit injected with a synaptic
+conductance waveform scaled to amplitude A and further white noise
+current source, given by the stochastic differential equation
+
+dV = rc...
+
+this model as been used to model neural intracellular recording
+several times before. In figure 2 and 3, we show that this model is
+insufficient and that there is also independent observation noise on
+every time point. Thus the final model is: 
+
+for i <- 1..n 
+  nr_i ~ B(p,n)
+  A_i ~ N(nr*q, ...)
+  dV_i = RC*(gsyn..)*dt + dW(t)
+  Vobs = N(V_i, sigma^2*I)
+
+where V is converted from a timeseries to a vector of time-sampled
+observations.
+
+There are a number of problems associated with using Bayesian
+inference directly on this model to infer likely values for N, p and
+q. First, it contains an extremely large number of parameters (at
+least one parameter per timepoint!) and would require all the recorded
+data to remain in memory at once. A more fundamental problem is
+this: on trials where exactly zero sites release neurotransmitter
+packets, the parameter A_i is distributed as N(0,inf) and so cannot be
+assigned a probability distribution.
+
+
 
 ## Results
 
