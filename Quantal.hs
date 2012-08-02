@@ -170,7 +170,8 @@ epspSigs sess = do
   writeFile (take 6 sess++"/sessions") $ show nms
 
 measNoise npars sess = runRIO $ do 
-  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
+  nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
+  LoadSignals sigs' <- io $ decodeFile $ take 6 sess++"/sigs_"++(head nms)++"_noise"
   let sigs = take 10 sigs'
       initparv = if npars ==1 then [-5] else [2::Double, 2, -6, -10]
       initialV = L.join $ map L.fromList [ take npars initparv, [sigAv $ head sigs]]    

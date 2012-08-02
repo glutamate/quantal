@@ -13,7 +13,7 @@ import Control.Monad
 import System.Directory
 import Math.Probably.RandIO
 import QuantalHelp
-import Baysig.Estimate.RTS
+import Baysig.Estimate.RTS hiding (repeat)
 import qualified Data.Binary as B
 import qualified Numeric.LinearAlgebra as L
 import Math.Probably.MCMC

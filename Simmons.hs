@@ -41,18 +41,22 @@ import qualified Data.Array.IArray as IA
 
 
 main = do
- let fl = "mar01"
- lns <- fmap lines $ readFile $ "/home/tomn/Dropbox/Quantal/Simmons/"++fl++".txt"
- mapM print $ take 40 lns
- let (vm, more) = (unParser getEpsp) lns
- let ((filter (<114) . filter (>0.03)) -> trigs, _) = (unParser getTriggers) more
+ let sess = "s22mar"
+ let fls = words "22Mar02 22Mar13 22Mar18"
+ let t0s = map (*60) [0, 18,38]
+ forM_ (zip fls t0s) $ \(fl,t0) -> do
+   lns <- fmap lines $ readFile $ "/home/tomn/Dropbox/Quantal/Simmons/"++fl++".txt"
+   mapM print $ take 40 lns
+   let (vm, more) = (unParser getEpsp) lns
+   let (map (+t0) . init . tail -> trigs, _) = (unParser getTriggers) more
  --mapM print $ take 10 trigs
- print $ (realToFrac (length vm) * 0.0002)
- let vmSig = Signal 0.0002 0 $ L.fromList vm
- encodeFile (fl++"/bigvm") $ LoadSignals [vmSig]
- encodeFile (fl++"/sigs_"++fl++"_epsps") $ LoadSignals (map (\t->limitSig (t-0.03) (t+0.17) vmSig) $ trigs)
- encodeFile (fl++"/sigs_"++fl++"_noise") $ LoadSignals (map (\t->limitSig (t-0.23) (t-0.03) vmSig) $ tail trigs)
- writeFile (fl++"/sessions") $ show [fl]
+   print $ (realToFrac (length vm) * 0.0002)
+   let vmSig = Signal 0.0002 t0 $ L.fromList vm
+-- encodeFile (fl++"/bigvm") $ LoadSignals [vmSig]
+   --print "done sigs"
+   encodeFile (sess++"/sigs_"++fl++"_epsps") $ LoadSignals (map (\t->limitSig (t-0.03) (t+0.17) vmSig) $ trigs)
+   encodeFile (sess++"/sigs_"++fl++"_noise") $ LoadSignals (map (\t->limitSig (t-0.23) (t-0.03) vmSig) $ tail trigs)
+ writeFile (sess++"/sessions") $ show fls
  return ()
 
 getEpsp :: Parser String [Double]

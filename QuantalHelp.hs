@@ -597,7 +597,7 @@ nsol = 4
 getWf sess = do
   nms <- fmap read $  readFile (take 6 sess++"/sessions")
   sigs' <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++sessNm++"_epsps" 
             return sigs
   let sigs = case lookup (take 3 sess) slopeFilter of
                 Nothing -> sigs'
