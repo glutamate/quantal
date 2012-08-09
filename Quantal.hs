@@ -60,7 +60,7 @@ main = do
 
   when ('8' `elem` dowhat) $ simulateAll [25, 50, 300] [1000,2500]
   when ('9' `elem` dowhat) $ simulateAll [200, 100] [1000, 2500]
- 
+
   when ('t' `elem` dowhat) $ testCovM sess
   when ('a' `elem` dowhat) $ measNoise 3 sess
   when ('b' `elem` dowhat) $ measNoise 2 sess
@@ -68,6 +68,7 @@ main = do
   when ('d' `elem` dowhat) $ measAmps 1 sess
   when ('e' `elem` dowhat) $ measAmps 3 sess
   when ('f' `elem` dowhat) $ measAmps 2 sess
+  when ('g' `elem` dowhat) $ measAmpsSimmons 3 sess
   when ('z' `elem` dowhat) $ measAll sess
 
   when ('y' `elem` dowhat) $ simulate4 sess rest
@@ -235,6 +236,41 @@ measAmps npars sess = runRIO $ do
   forM_ sigs $ \sig@(Signal dt t0 _) -> do
       let initialV = L.fromList [-60,1]
       case laplaceApprox defaultAM {nmTol = 0.001} (posteriorSigV wf invDetails sig) [] [] initialV of
+
+         (v, Just cor, smplx) -> do
+                let amp = v @> 1
+                    sd = sqrt $ (L.@@>) cor (1,1)
+                io $ putStrLn $ "by Laplace: "++ show (t0,amp,sd)
+
+                io $ hPutStrLn h $ show (t0, amp,sd)
+
+         _             -> do
+                vsamples <- nmAdaMet defaultAM (posteriorSigV wf invDetails sig) [] [] initialV
+                let (amp,sd) = both meanF stdDevF `runStat` map (@>1) vsamples
+                io $ print (t0,amp,sd)
+                io $ hPutStrLn h $ show (t0, amp,sd)
+      --plotPts $ zip [0..] $ map (@>1) vsamples
+      return ()
+  io $ hClose h
+  return ()
+
+measAmpsSimmons npars sess = runRIO $ do
+  noisepars <- fmap read $ io $ readFile (take 6 sess++"/noisePars"++show npars)
+  let covM = mkCovM np noisepars 
+  let invDetails = invlndetC covM
+  {-nms <- fmap read $ io $ readFile (take 6 sess++"/sessions")
+  sigs <- fmap concat $ forM nms $ \sessNm-> do 
+            LoadSignals sigs <- io $ decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+            return sigs
+  let wf = baselineSig 0.003 $ averageSigs $ sigs -}
+  (wf, _, sigs) <- io $ getWf sess
+  h<- io $ openFile (take 6 sess++"/epsps"++show npars) WriteMode 
+  let initialV = L.fromList [-60,1,1]
+  --io $ print wf
+  io $ putStrLn "inital p"
+  io $ print $ posteriorSigSimmonsV wf invDetails (head sigs) initialV
+  forM_ sigs $ \sig@(Signal dt t0 _) -> do
+      case laplaceApprox defaultAM {nmTol = 0.001} (posteriorSigSimmonsV wf invDetails sig) [] [] initialV of
 
          (v, Just cor, smplx) -> do
                 let amp = v @> 1

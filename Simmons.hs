@@ -42,8 +42,8 @@ import qualified Data.Array.IArray as IA
 
 main = do
  let sess = "s22mar"
- let fls = words "22Mar02 22Mar13 22Mar18"
- let t0s = map (*60) [0, 18,38]
+ let fls = map (("22Mar"++) . padzero . show) [2..18] --words "22Mar02 22Mar13 22Mar18"
+ let t0s = map (*60) $ [0, 2,4,7,10,12,15,20,24,29,34,38] ++ map (38+) [4,7,12,17,22]
  forM_ (zip fls t0s) $ \(fl,t0) -> do
    lns <- fmap lines $ readFile $ "/home/tomn/Dropbox/Quantal/Simmons/"++fl++".txt"
    mapM print $ take 40 lns
@@ -54,8 +54,8 @@ main = do
    let vmSig = Signal 0.0002 t0 $ L.fromList vm
 -- encodeFile (fl++"/bigvm") $ LoadSignals [vmSig]
    --print "done sigs"
-   encodeFile (sess++"/sigs_"++fl++"_epsps") $ LoadSignals (map (\t->limitSig (t-0.03) (t+0.17) vmSig) $ trigs)
-   encodeFile (sess++"/sigs_"++fl++"_noise") $ LoadSignals (map (\t->limitSig (t-0.23) (t-0.03) vmSig) $ tail trigs)
+   encodeFile (sess++"/sigs_"++fl++"_epsps") $ LoadSignals (map (\t->limitSig (t-0.03) (t-0.03+tmax) vmSig) $ trigs)
+   encodeFile (sess++"/sigs_"++fl++"_noise") $ LoadSignals (map (\t->limitSig (t-0.03-tmax) (t-0.03) vmSig) $ tail trigs)
  writeFile (sess++"/sessions") $ show fls
  return ()
 

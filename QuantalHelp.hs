@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, NoMonomorphismRestriction, ViewPatterns, PackageImports, BangPatterns #-}
 module QuantalHelp where
-import "probably" Math.Probably.MCMC
+import "probably" Math.Probably.MCMC hiding (traceIt) 
 import "probably" Math.Probably.StochFun
 import "probably" Math.Probably.Sampler
 import "probably" Math.Probably.FoldingStats
@@ -136,7 +136,7 @@ betaInit = \a-> \b-> a/(a+b)
 alpha = \tc-> \t-> ((((step t)*tc)*tc)*t)*(exp ((0.000-t)*tc))
 qsig = \amp-> \tc-> \t0-> \off-> \t-> off+(amp*(alpha tc (t-t0)))
 covOUOld = \theta-> \sigma-> \s-> \t-> (((sigma*sigma)*0.500)/theta)*(exp (0.000-(theta*(abs (s-t)))))
-dt = 1.000e-4 -- 0.0002 -- 5.000e-5
+dt = 2.000e-4 -- 0.0002 -- 5.000e-5
 tmax = 0.1 --0.2
 np = round$(tmax/dt)
 toD = \i-> (realToFrac i)*dt
@@ -333,6 +333,22 @@ posteriorSigV wf invDetails sig v
   = ouSynapseLogPdf invDetails (scaleSig (v0) amp wf) sig
  where v0 = v@> 0
        amp = v@>1       
+
+posteriorSigSimmonsV wf@(Signal dt t0 vecAvSig) invDetails sig v 
+  = ouSynapseLogPdf invDetails theSig sig
+ where v0 = v@> 0
+       amp = v@>1  
+       ampArtefact = v@>2
+       theSig = Signal dt t0 $ L.join [vecArtefact, vecRemainder]
+       vecArtefact = L.mapVector (\v-> v*ampArtefact +v0) $ L.subVector 0 nsplitSim vecAvSig
+       vecRemainder = L.mapVector (\v-> v*amp +v0) $ L.subVector nsplitSim (L.dim vecAvSig -nsplitSim) vecAvSig
+
+
+simmons_dt = 0.0002
+
+nsplitSim = round $ 0.035/simmons_dt
+
+-- scaleSig off x (Signal dt t0 vec) = Signal dt t0 (L.mapVector (\v-> v*x+off) vec)
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
 -- oneToLogPdf (800) n
@@ -599,10 +615,11 @@ getWf sess = do
   sigs' <- fmap concat $ forM nms $ \sessNm-> do 
             LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++sessNm++"_epsps" 
             return sigs
+  --forM_ sigs' $ \(Signal dt tmax arr) -> print (dt, tmax, L.dim arr)
   let sigs = case lookup (take 3 sess) slopeFilter of
                 Nothing -> sigs'
                 Just x -> filter ((<x) . abs . sigSlope) sigs'
-  let wf@(Signal _ _ sv) = zeroSigInit 0.03 $ baselineSigFrom 0.02 0.032 $ averageSigs $ sigs
+  let wf@(Signal _ _ sv) =  zeroSigInit 0.03 $ baselineSigFrom 0.02 0.03 $  averageSigs $ sigs
   return $ (wf, foldl1' max $ L.toList sv, sigs')
 
 getWf' sess = do
@@ -685,6 +702,10 @@ runGibbs' ((n,topcool):rest) sd amps pcurve pars xs = do
 reset_counts n ampar = ampar { count = n, count_accept = n `div` 2} 
 
 shrink x ampar = ampar {ampCov = L.scale (recip x) $ ampCov ampar} 
+
+padzero s@([_]) = '0':s
+padzero s = s
+
 
 wToRGB w 
  | w >= 380 && w < 440 = 

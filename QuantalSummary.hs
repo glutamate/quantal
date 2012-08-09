@@ -130,7 +130,24 @@ compareNPQ = writeTex "npqSummary.tex" $ do
 main = do
   --simsum
 --  mapM_ countSigs datasess
-  compareNPQ
+ -- compareNPQ
+  --plotSigs
+  cellSummary "s22mar"
+
+sigZero (Signal dt t0 arr) = Signal dt 0 arr
+sigRestrict tstart tend (Signal dt t0 arr) = Signal dt (tstart) $ L.subVector ndrop ntake arr where
+  ntake = round $ (tend-tstart)/dt
+  ndrop = round $ tstart/dt
+
+
+plotSigs = writeTex "npqSummary.tex" $ do
+ let fls = map (("22Mar"++) . padzero . show) [2..18] --words "22Mar02 22Mar13 22Mar18"
+ let sess = "s22mar"
+ forM_ fls $ \fl -> do
+    LoadSignals sigs <- lift $ B.decodeFile (sess++"/sigs_"++fl++"_epsps")
+    putLn fl
+    plotIt fl $ map (sigZero) sigs
+
 
 countSigs1 sess = do
   spks <- fmap (concat . catMaybes) $ inEverySession $ whenContinues sess $ do
@@ -147,3 +164,24 @@ countSigs1 sess = do
      return $ Just spikeg
   print $ (sess, length spks)
 
+ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
+
+
+cellSummary sess = writeTex "cellSummary.tex" $ do
+  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ lift $ readFile (sess++"/epsps3")
+
+  (wf, wfAmp, sigs) <- lift $ getWf sess
+  let tsamps = filter (getFilter sess) $ zip t0s' $ amps'
+      t0s = map fst tsamps
+
+
+  let weighCurve' = map (weighRegression tsamps ) t0s
+      maxPcurve = foldl1 max weighCurve'
+      pcurve = map (/(maxPcurve)) weighCurve'
+  let globalSd = runStat  meanF sds
+
+  plotIt "pcurve" $ zip t0s pcurve :+: tsamps
+
+  plotIt "wf" wf
+
+  plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
