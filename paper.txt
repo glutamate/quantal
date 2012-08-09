@@ -23,8 +23,8 @@ Markov-chain monte carlo. We then measure quantal parameters from recordings..
 
 Quantal analysis is the central measuremernt problem of synaptic
 physiology. By using fluctuations in measred EPSP strengths
-.. elucidate what: locus of chaneg. structure of synapse. multiquyantal release. 
-
+.. elucidate what: locus of chaneg. structure of
+synapse. multiquyantal release.
 
 [In multi-probability fluctuation
 analysis, we make recordings in several different release probability
@@ -37,18 +37,23 @@ variant, Humeau et al (1198) use recordings made during slow changes
 of release probabilit. We have shown that these methods are
 insufficient for our recordings.]
 
-
 How: state of the art. Requirements. 
 
 slow change. Humeau idea. 
 
-
+most natural way of estimating things is ML or bayes. 
 
 Locust phase change. motivate investigation.
 
 here: fail!
 
-## Probabilistic model 
+## Methods
+
+## Electrophysiological recordings
+
+blah blah
+
+## Probabilistic model and inference
 
 Or model of synaptic potential waveforms is based on the binomial
 model for synaptic release (Katz; Silver?). We assume that a synaptic
@@ -81,10 +86,10 @@ insufficient and that there is also independent observation noise on
 every time point. Thus the final model is: 
 
 for i <- 1..n 
-  nr_i ~ B(p,n)
+  nr_i ~ B(p_i,n)
   A_i ~ N(nr*q, ...)
-  dV_i = RC*(gsyn..)*dt + dW(t)
-  Vobs = N(V_i, sigma^2*I)
+  dV_i = RC*(A*gsyn..)*dt + dW(t)
+  Vobs = N(V_i, sigma_obs^2*I)
 
 where V is converted from a timeseries to a vector of time-sampled
 observations.
@@ -92,13 +97,112 @@ observations.
 There are a number of problems associated with using Bayesian
 inference directly on this model to infer likely values for N, p and
 q. First, it contains an extremely large number of parameters (at
-least one parameter per timepoint!) and would require all the recorded
-data to remain in memory at once. A more fundamental problem is
-this: on trials where exactly zero sites release neurotransmitter
-packets, the parameter A_i is distributed as N(0,inf) and so cannot be
-assigned a probability distribution.
+least one parameter (V_i) per timepoint!) and would require all the recorded
+data to remain in memory at once. A more fundamental problem is this:
+on trials where exactly zero sites release neurotransmitter packets,
+the parameter A_i is distributed as N(0,0) and so cannot be assigned
+a probability distribution. Furthermore, we have yet to specify the
+form or the parameters of the synaptic conductance waveform gsyn(t) or
+how the release probablities p_i are distributed. We solve all of
+these problems by rewriting the model and making a series of pragmatic
+approximations.
 
+First, we rewrite the SDE governing V to a gaussian process. The SDE
+is a Ornstein-Uhlenbeck process which has covariance function 
 
+cov (t1,t2) = ...
+
+Thus, if we are interested in the values of this process at times
+corresponding to the time points at which the membrane potential
+was recorded, these values can be written as vector sampled from a
+multivariate normal distribution. 
+
+[v(t1), v(t2)....] ~ N(mu, BigSigma)
+
+where BigSimga is filled in by evaluating the covariance function at
+the appropriate pair of time points.
+
+The advantage of the gaussian process is that it can be combined with
+the observation noise, such that the probability distribution for Vobs
+can be given directly:
+
+[vobs(t1), vobs(t2)....] ~ N(mu, BigSigma+sigma_obs^2*I)
+
+This transformation eliminates the vast number of parameters (V_i) in
+out model.
+
+Second, we use the overall mean potential waveform calculated from the
+real data as the amplitude-scaled mean waveform for the gaussian
+process in the model. This is clearly an approximation, in that in a
+fully probabilistic approach there would be some uncertainty about the
+shape of this waveform. Nevertheless, for the large number of
+recordings we have made here this uncertainty is likely to be small;
+our approach is broadly consistent with Empirical Bayes methods. 
+
+There still remains the limitation that the prior for the amplitude
+parameter A cannot be assigned a density function in the case of
+failures. We solve this by splitting the quantal analysis up into
+three separate estimation problems. First, we estimate the parameters
+of the covariance matrix that describes the noise process from
+membrane potential recordings . Second, amplitudes Ai from the raw
+data based on the gaussian process, with a impropoer uniform prior on
+A (essentially Maximum likelihood estimation). This gives a mean and
+an error for A (as we show in apendix A, the posterior is gaussian and
+the error is independent of A and determined entirely by the
+covariance matrix and the mean waveform). Third, we use the estimated
+mean as the observed A and add the estimated variance of A to the
+normal distribution by which it is distributed. We now describe these
+three steps in detail:
+
+1. Noise process estimation 
+
+We give a model for noisy membrane potential recordings in the absense
+of evoked synaptic input:
+
+[vobs(t1), vobs(t2)....] ~ N(vmean, BigSigma+sigma_obs^2*I)
+
+where bigSigma_t1,t2 = exp ...
+
+The model parameters are thus theta, sigma, sigmaObs and vmean, which
+is assumued to be a scalar value. 
+
+We estimated these parameters for each cell by maximising the
+likelihood based on 10 X ms segments recorded prior to an evoked
+EPSP. 
+
+2. EPSP amplitude estimation
+
+The model for EPSP waveforms is nearly identical to that of the noise
+process:
+
+[vobs(t1), vobs(t2)....] ~ N(A*vm(t)+v0, BigSigma+sigma_obs^2*I)
+
+but here the entire covariance matrix is regarded as a fixed quantity,
+using the maximum likelihood parameters from the noise estimation. The
+only remaining parameters are A and v0 (a nuisance parameters). We
+optimised the likelihood of each recorded EPSP independently using the
+Nelder-Mead simplex method, and recorded for each waveform the maximum
+likelihood estimate Ahat and the variance sigma_A calculated from the
+inverse of a finite-difference approximation to the Hessian of the
+likelihood function at the peak. 
+
+3. Quantal parameter estimation
+
+We used the inidividual EPSP estimates Ahat and their uncertainty
+sigma_A as the data from which quantal parameters were estimated. The
+model for these amplitudes is given by
+
+for i <- 1..n 
+  nr_i ~ B(p_i,N)
+  A_i ~ N(nr*q, ... + sigma_A^2)
+
+which has a single latent parameter per EPSP. We can collapse this
+parameter by summing over it. This leave no repeated latent variable
+at all:
+
+p(Ai,sigma_a) = sum nr <- 0..n $ ...
+
+We used the adaptive metropolis sampler (Haario) to sample N, q, p. 
 
 ## Results
 
