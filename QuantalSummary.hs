@@ -185,11 +185,11 @@ cellSummary sess = writeTex "cellSummary.tex" $ do
   plotIt "wf" wf
 
   plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
-  whenM (doesFileExist (take 6 sess++"/npq_samples")) $ do
-    fileconts::[L.Vector Double] <- fmap read $ readFile (take 6 sess++"/npq_samples")
+  whenM (lift $ doesFileExist (take 6 sess++"/npq_samples")) $ do
+    fileconts::[L.Vector Double] <- fmap read $ lift $ readFile (take 6 sess++"/npq_samples")
      
-    sigs <- do LoadSignals sigs <-  B.decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps" 
-               return sigs
+    sigs <- lift $ do LoadSignals sigs <-  B.decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps" 
+                      return sigs
     let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
     let wfAmp = foldl1' max $ L.toList sv
     --let qmv  = wfAmp * q
@@ -198,12 +198,12 @@ cellSummary sess = writeTex "cellSummary.tex" $ do
           putLn $ s++" = "++(show $ runStat meanSDF $ map f fileconts)
 
 
-    putIt $ "n" (\v-> (realToFrac $ round $ v @> 0)::Double) 
-    putIt $ "cv" (\v-> exp $ v @> 1)
-    putIt $ "phi" $ (\v->1/(1+exp(-(v @> 2))))
-    putIt $ "q" $  (\v->wfAmp * (exp $ v @> 3))
+    putIt "n" (\v-> (realToFrac $ round $ v @> 0)::Double) 
+    putIt "cv" (\v-> exp $ v @> 1)
+    putIt "phi" $ (\v->1/(1+exp(-(v @> 2))))
+    putIt "q" $  (\v->wfAmp * (exp $ v @> 3))
     
-    putStrLn $ "\nq = "++show qmv ++" mV"
+    --putStrLn $ "\nq = "++show qmv ++" mV"
 
     return ()
-  putStr "\n"
+  --putStr "\n"
