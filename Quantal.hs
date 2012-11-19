@@ -315,7 +315,7 @@ measAmpsSimmons npars sess = runRIO $ do
  
 measNPQ sess = runRIO $ do
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (take 6 sess++"/epsps3")
+  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (sess++"/epsps3")
   let tsamps =  filter (getFilter sess) $ zip t0s' amps'
       --tsamps = filter ((<3) . (\(t, amp)-> zscore tsamps' (t,amp))) tsamps'
       t0s = map fst tsamps
@@ -351,8 +351,8 @@ measNPQ sess = runRIO $ do
 
   --fail "boo!"
 
-  let nsam    = 15000
-      nfrozen = 1000000
+  let nsam    = 20000
+      nfrozen = 100000
 
 
   iniampar <- sample $ initialAdaMet 1000 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
@@ -366,7 +366,7 @@ measNPQ sess = runRIO $ do
   iniampar1 <- initAdaMetFromCovNPQ 10000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
-  runAdaMetRIOtoFile nfrozen 10 (take 6 sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
+  runAdaMetRIOtoFile nfrozen 10 (sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
 
 {-  io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 
