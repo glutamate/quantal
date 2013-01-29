@@ -357,7 +357,7 @@ nsplitSim = round $ 0.035/simmons_dt
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
 -- oneToLogPdf (800) n
- normalLogPdf (-1.9) 100 (log cv) -- uniformLogPdf 0 0.5 cv
+ normalLogPdf (log 0.25) 100 (log cv) -- uniformLogPdf 0 0.5 cv
 -- +uniformLogPdf (0) (1) phi
 -- +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->

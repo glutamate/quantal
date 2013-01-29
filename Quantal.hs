@@ -315,7 +315,7 @@ measAmpsSimmons npars sess = runRIO $ do
  
 measNPQ sess = runRIO $ do
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (take 6 sess++"/epsps3")
+  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (sess++"/epsps3")
   let tsamps =  filter (getFilter sess) $ zip t0s' amps'
       --tsamps = filter ((<3) . (\(t, amp)-> zscore tsamps' (t,amp))) tsamps'
       t0s = map fst tsamps
@@ -351,22 +351,32 @@ measNPQ sess = runRIO $ do
 
   --fail "boo!"
 
-  let nsam    = 15000
-      nfrozen = 1000000
+  let nsam    = 20000
+      nfrozen = 100000
 
+      post = post
 
-  iniampar <- sample $ initialAdaMet 1000 (const 5e-3) (posteriorNPQV amps pcurve globalSd) maxFullV
+  iniampar <- sample $ initialAdaMet 1000 (const 5e-3) post maxFullV
   io $ putStr "inipar ="
   io $ print $ iniampar 
 
-  froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.5}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
+  vpars <- runFixMetRio 4 nsam iniampar post
+  let cov0 = empiricalCovariance vecs              
+  let mn0 = empiricalMean vecs
+
+  let fixAmpar = AMPar (last vpars) mn0 cov0 2.4 (post (last vpars)) n (n `div` 5)
+  
+  runFixMetRioToFile nfrozen 10 (sess++"/npq_samples") 4 fixAmpar post
+
+  
+  {-froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.5}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
   io $ putStr "frozenpar ="
   io $ print $ froampar
   
   iniampar1 <- initAdaMetFromCovNPQ 10000 (posteriorNPQV amps pcurve globalSd) (ampMean froampar) 0
                                                                             (ampCov froampar) 
 
-  runAdaMetRIOtoFile nfrozen 10 (take 6 sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) 
+  runAdaMetRIOtoFile nfrozen 10 (sess++"/npq_samples") True (iniampar {scaleFactor = 2.4}) (posteriorNPQV amps pcurve globalSd) -}
 
 {-  io $ writeFile (take 6 sess++"/npq_samples") $ show vsamples
   let (mean,sd) =  (both meanF stdDevF) `runStat` vsamples 

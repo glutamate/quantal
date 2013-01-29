@@ -128,11 +128,12 @@ compareNPQ = writeTex "npqSummary.tex" $ do
   plotIt "ampplot" $ ManySup $ map q1 ptss
 
 main = do
+  sess:_ <- getArgs
   --simsum
 --  mapM_ countSigs datasess
  -- compareNPQ
   --plotSigs
-  cellSummary "s22mar"
+  cellSummary sess
 
 sigZero (Signal dt t0 arr) = Signal dt 0 arr
 sigRestrict tstart tend (Signal dt t0 arr) = Signal dt (tstart) $ L.subVector ndrop ntake arr where
@@ -168,8 +169,9 @@ ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
 
 
 cellSummary sess = writeTex "cellSummary.tex" $ do
-  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ lift $ readFile (sess++"/epsps3")
+{-  (t0s'::[Double], amps'::[Double],sds::[Double]) <- fmap ffile  $ lift $ readFile (sess++"/epsps3")
 
+  putLn sess
   (wf, wfAmp, sigs) <- lift $ getWf sess
   let tsamps = filter (getFilter sess) $ zip t0s' $ amps'
       t0s = map fst tsamps
@@ -184,4 +186,55 @@ cellSummary sess = writeTex "cellSummary.tex" $ do
 
   plotIt "wf" wf
 
-  plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs]
+  plotIt "wfs" $ concat [take 5 sigs, take 5 $ reverse sigs] -}
+  putLn $ "$"++sess++"$\n\n"
+  whenM (lift $ doesFileExist (sess++"/npq_samples")) $ do
+    fileconts::[L.Vector Double] <- fmap (map L.fromList . catMaybes . map safeRead . lines) $ lift $ readFile (sess++"/npq_samples")
+     
+{-    sigs <- lift $ do LoadSignals sigs <-  B.decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_epsps" 
+                      return sigs
+    let wf@(Signal _ _ sv) = baselineSig 0.003 $ averageSigs $ sigs
+    let wfAmp = foldl1' max $ L.toList sv -}
+
+    --let qmv  = wfAmp * q
+    
+    (wf, wfAmp, sigs) <- lift $ getWf sess
+
+    lift $ print wfAmp
+   
+    lift $ print $ head fileconts
+    lift $ print $ last fileconts
+
+    let putIt s f = 
+          putLn $ s++" = "++(show $ runStat meanSDF $ map f fileconts)
+
+
+
+
+    let getN = (\v-> (realToFrac $ round $ v @> 0)::Double) 
+        getCV= (\v-> exp $ v @> 1)
+        getPhi = (\v->1/(1+exp(-(v @> 2))))
+        getQ =  (\v->wfAmp * (exp $ v @> 3))
+    
+    plotIt "phi" $ ("phi",zip [0::Double .. ] $ map getPhi fileconts)
+    plotIt "n" $ ("n", zip [0::Double .. ] $ map getN fileconts)
+    plotIt "q"$ ("q", zip [0::Double .. ] $ map getQ fileconts)
+
+
+    plotIt "nhist" $ Histo 200 $ map getN fileconts
+
+
+    putIt "n" getN
+    putIt "phi" getPhi
+    putIt "q" getQ
+
+    --putStrLn $ "\nq = "++show qmv ++" mV"
+
+    return ()
+  --putStr "\n"
+
+
+safeRead :: Read a => String -> Maybe a
+safeRead x = case readsPrec 5 x of 
+               [] -> Nothing
+               (x,_):_ -> Just x
