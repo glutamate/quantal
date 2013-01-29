@@ -255,6 +255,11 @@ ouSynapseLogPdf (covinv, lndet)
 
 scaleSig off x (Signal dt t0 vec) = Signal dt t0 (L.mapVector (\v-> v*x+off) vec)
 
+sigFrom from  (Signal dt t0 vec) =
+    let ndrop = round $ (from - t0)/dt
+    in Signal dt from (L.fromList $ drop ndrop $L.toList vec) 
+
+
 sigNpts (Signal _ _ v)= L.dim v
 
 zeroSigInit :: Double -> Signal Double -> Signal Double

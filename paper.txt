@@ -369,3 +369,9 @@ under baseline (4 mM Ca2+) conditions in solitarious and gregarious
 animals. C, Estimates of the quantal size (Q) in solitarious (top) and
 gregarious (bottom) animals.
 
+8. Estimate of quantal synaptic parameters of the stretch receptor
+synapse. A, Evoked synaptic potentials including the electrical
+stimulation artifact. B, Estimated timecourse of artifact (top) and
+synaptic (bottom) amplitudes. C, Estimates of quantal size (Q),
+maximal release probability (P_max) and the number of release sites
+(N) for three different assumed quantal variabilities (0.05-0.25).

@@ -102,7 +102,7 @@ main = do
              sample $ sequence $ replicate 10 $ fmap (id {-baselineSig 0.1 -}) $ gpByChol dt (\t-> 0) cholm
     
 
-  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 4 $ do
+  let mkFakeAutoCorr npars fnm = runRIO $ sequence $ replicate 40 $ do
                          sigs <-  mkFakeSigs npars fnm                          
                          return (avSigs $ map autoCorrSig $ sigs, map sigSpan sigs) 
 
@@ -199,7 +199,7 @@ sigSpan (Signal dt t0 vec) = let (lo,hi) = runStat (both minF maxF) $ L.toList v
                              in hi - lo
 
 autoCorrSig :: Signal Double -> Signal Double
-autoCorrSig (Signal dt t0 vec) = Signal dt t0 $ L.fromList $ autoCorr $ L.toList vec
+autoCorrSig (Signal dt t0 vec) = Signal dt 0 $ L.fromList $ autoCorr $ L.toList vec
 
 --http://www.bearcave.com/misl/misl_tech/wavelets/stat/index.html
 autoCorr :: [Double] -> [Double]
