@@ -82,7 +82,9 @@ main = do
   let wfAmp = foldl1' max $ L.toList sv
   puts $ "Figure 1\n\n"
 
-  let plotA = AxisLabels "time (s)" "membrane voltage (mV)" $ (Lines [LineWidth 1, LineType 1, LineColor "red"] $ take 10 $ drop 250 sigs) :+: (Lines [LineWidth 4, LineType 1, LineColor "black"] $ smap (\v -> v-2.5) wf)
+  let plotA = AxisLabels "time (s)" "membrane voltage (mV)" $ 
+                  (Lines [LineWidth 1, LineType 1, LineColor "red"] $ sigsAlignZero $ take 10 $ drop 250 sigs) :+: 
+                  (Lines [LineWidth 4, LineType 1, LineColor "black"] $ sigAlignZero $ smap (\v -> v-2.5) wf)
 
 
 --  plotIt "wf" wf
@@ -99,7 +101,8 @@ main = do
 
   let plotD = AxisLabels "mean (mV)" "variance (mV^2)" $mpfa 500 measPts
 
-  plotIt "sigs" $ (A plotA :||: B plotB) :==: (C plotC :||: D plotD)
+  plotIt "fig1" $ (A plotA :||: B plotB) :==: (C plotC :||: D plotD)
+  plotIt "gnuplot_test" $ GnuplotTest
 
 --  plotIt ("epsps_"++ take 6 sess) $ measPts
 

@@ -61,7 +61,7 @@ main = do
 
   hist2 <- plotSamPdf  (binGaussFull nrel prel q cv bgSd) (exp . binGaussLogPdf nrel prel q cv bgSd)
 
-  plotIt "fig3" $ (XRange (-0.1) 0.6 $ A  hist1 :==: B hist2) 
+  plotIt "fig4" $ (XRange (-0.1) 0.6 $ A  hist1 :==: B hist2) 
 
   puts "\\end{document}"
   hClose h

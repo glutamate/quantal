@@ -255,6 +255,11 @@ ouSynapseLogPdf (covinv, lndet)
 
 scaleSig off x (Signal dt t0 vec) = Signal dt t0 (L.mapVector (\v-> v*x+off) vec)
 
+sigFrom from  (Signal dt t0 vec) =
+    let ndrop = round $ (from - t0)/dt
+    in Signal dt from (L.fromList $ drop ndrop $L.toList vec) 
+
+
 sigNpts (Signal _ _ v)= L.dim v
 
 zeroSigInit :: Double -> Signal Double -> Signal Double
@@ -456,6 +461,11 @@ cut = 500
 
 sigSlope :: Signal Double -> Double
 sigSlope (Signal dt _ sv) = fst $ runStat regressF $ zip [0,dt..] $ L.toList sv
+
+sigAlignZero :: Signal Double -> Signal Double
+sigAlignZero (Signal dt _ sv) = (Signal dt 0 sv)
+
+sigsAlignZero = map sigAlignZero
 
 weigh _ [] = []
 weigh t_hat (pt@(t_data,y):rest) 
