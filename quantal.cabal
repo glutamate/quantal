@@ -13,7 +13,7 @@ Executable quantal
    Main-Is:             Quantal.hs
    ghc-options:         -O2 -auto-all -rtsopts
 
-   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl, 
+   Build-depends:       base, bugpan, gnewplot, probably==0.2.1, hmatrix, mtl, 
                         process, unix, binary, storablevector, storable-tuple,
                         array, directory, baysig, spoon
 

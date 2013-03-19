@@ -11,7 +11,7 @@ import Data.Maybe
 import Data.List
 import Control.Monad
 import System.Directory
-import "probably" Math.Probably.RandIO
+import "probably" Math.Probably.RandIO hiding (initAdaMetFromCov)
 import QuantalHelp
 import "baysig" Baysig.Estimate.RTS
 import Data.Binary
@@ -315,7 +315,7 @@ measAmpsSimmons npars sess = runRIO $ do
  
 measNPQ sess = runRIO $ do
   let ffile = (unzip3 .  sortBy (comparing fst3) . map read . lines)
-  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (sess++"/epsps3")
+  (t0s'::[Double], amps'::[Double],sds) <- io $ fmap ffile  $ readFile (take 6 sess++"/epsps3")
   let tsamps =  filter (getFilter sess) $ zip t0s' amps'
       --tsamps = filter ((<3) . (\(t, amp)-> zscore tsamps' (t,amp))) tsamps'
       t0s = map fst tsamps
@@ -340,7 +340,7 @@ measNPQ sess = runRIO $ do
       startN = getStartN sess
 
 --  let npq@(maxV, maxN, _, smplx) = fastNPQ fastPDF  70 $  L.fromList [-10,0.5,-3.7]
-  let npq@(maxV, maxN, _, smplx) = fastNPQup fastPDF  35 $  L.fromList [-10,0.5,-3.7]
+  let npq@(maxV, maxN, _, smplx) = fastNPQup fastPDF  30 $  L.fromList [-10,0.5,-3.7]
 
   
   let maxFullV = L.join [ L.fromList [realToFrac maxN], maxV]
@@ -351,22 +351,22 @@ measNPQ sess = runRIO $ do
 
   --fail "boo!"
 
-  let nsam    = 20000
-      nfrozen = 100000
+  let nsam    = 100000
+      nfrozen = 1000000
 
-      post = post
+      post = posteriorNPQV amps pcurve globalSd
 
   iniampar <- sample $ initialAdaMet 1000 (const 5e-3) post maxFullV
   io $ putStr "inipar ="
   io $ print $ iniampar 
 
   vpars <- runFixMetRio 4 nsam iniampar post
-  let cov0 = empiricalCovariance vecs              
-  let mn0 = empiricalMean vecs
+  let cov0 = empiricalCovariance vpars              
+  let mn0 = empiricalMean vpars
 
-  let fixAmpar = AMPar (last vpars) mn0 cov0 2.4 (post (last vpars)) n (n `div` 5)
+  let fixAmpar = AMPar (last vpars) mn0 cov0 2.4 (post (last vpars)) nsam (nsam `div` 5)
   
-  runFixMetRioToFile nfrozen 10 (sess++"/npq_samples") 4 fixAmpar post
+  runFixMetRioToFile nfrozen 10 (take 6 sess++"/npq_samples") 4 fixAmpar post
 
   
   {-froampar <- runAndDiscard nsam (showNPQV') (iniampar {scaleFactor = 1.5}) $ adaMet False  (posteriorNPQV amps pcurve globalSd)
