@@ -18,7 +18,7 @@ import System.IO.Unsafe
 import qualified Math.Probably.PDF as PDF
 import qualified Numeric.LinearAlgebra as L
 import "baysig" Baysig.Estimate.RTS
-import "probably" Math.Probably.RandIO
+import "probably" Math.Probably.RandIO hiding (initAdaMetFromCov)
 import "probably" Math.Probably.NelderMead
 import Data.List
 import System.Environment
@@ -357,7 +357,7 @@ nsplitSim = round $ 0.035/simmons_dt
 
 posteriorNPQV amps pcurve sd v = -- ((n,cv,slope,offset,phi,plo,q,tc,t0), loopvals) = 
 -- oneToLogPdf (800) n
- normalLogPdf (log 0.25) 100 (log cv) -- uniformLogPdf 0 0.5 cv
+ normalLogPdf (log 0.15) 100 (log cv) -- uniformLogPdf 0 0.5 cv
 -- +uniformLogPdf (0) (1) phi
 -- +uniformLogPdf (0.000) (1) q
  +(sum $ (flip map) (zip pcurve amps) $ \(pcurveVal, amp)->
@@ -461,6 +461,11 @@ cut = 500
 
 sigSlope :: Signal Double -> Double
 sigSlope (Signal dt _ sv) = fst $ runStat regressF $ zip [0,dt..] $ L.toList sv
+
+sigAlignZero :: Signal Double -> Signal Double
+sigAlignZero (Signal dt _ sv) = (Signal dt 0 sv)
+
+sigsAlignZero = map sigAlignZero
 
 weigh _ [] = []
 weigh t_hat (pt@(t_data,y):rest) 
@@ -618,7 +623,7 @@ nsol = 4
 getWf sess = do
   nms <- fmap read $  readFile (take 6 sess++"/sessions")
   sigs' <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++sessNm++"_epsps" 
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
             return sigs
   --forM_ sigs' $ \(Signal dt tmax arr) -> print (dt, tmax, L.dim arr)
   let sigs = case lookup (take 3 sess) slopeFilter of

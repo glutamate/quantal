@@ -169,15 +169,15 @@ main = do
   plotIt "cookhp" $ ManySup $ map ( snd . trd3)  pcts -}
   --print $ percentile' 0.3 [0.0, 0.001..1]
 
-  
+  let lns = Lines [LineWidth 1, LineType 1, LineColor "black"]  
 
-  plotIt "finalTop" $ ((AxisLabels "time (s)" "Vm (mV)" $ concat[take 5 sigs, take 5 $ reverse sigs]) :||:
+  plotIt "fig5a" $ ((AxisLabels "time (s)" "Vm (mV)" $ lns $ sigsAlignZero $ concat[take 5 sigs, take 5 $ reverse sigs]) :||:
                       (AxisLabels "time (s)" "EPSP amplitude (mV)" tsamps)) :==: 
                       ((AxisLabels "N" "P" (zip ns ps)) :||:
                         (AxisLabels "N" "Q (mV?)") (zip ns qs))
 
-  plotIt "finalBot" $ (AxisLabels "Q" "P" (zip qs ps) :||: AxisLabels "Variance" "Mean" mnvars) :==: 
-                      ((ManySup $ map ( fst . trd3)  pcts) :||: (AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map (fst . fst3) pcts))
+  plotIt "fig5b" $ (AxisLabels "Q" "P" (zip qs ps) :||: AxisLabels "Variance" "Mean" mnvars) :==: 
+                      (( Lines [LineWidth 1, LineType 1] $ ManySup $ map ( fst . trd3)  pcts) :||: (AxisLabels "Simulation number" "Percentile" $ zip [(0::Double)..] $ sort $ map (fst . fst3) pcts))
 
 
   plotIt "mpfahist" $ Histo 20 $ filter (<80) $ map (snd . fst3) pcts

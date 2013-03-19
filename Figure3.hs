@@ -85,7 +85,7 @@ main = do
 
   meass <- measTrad sess 
 
-  (wf, wfAmp, sigs) <- getWf sess
+  (wf, wfAmp, sigs) <- getWf $ take 6 sess
 
   --puts $ "wfamp= "++show wfAmp++"\n"
 
@@ -157,7 +157,7 @@ main = do
   --puts $ show $ map fst var12
   --puts $ show $ map snd var12
 
-  plotIt "fig2" $ 66% topQuad :--: 34%varplot
+  plotIt "fig3" $ 66% topQuad :--: 34%varplot
 
   puts "\\end{document}"
   hClose h

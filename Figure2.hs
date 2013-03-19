@@ -57,7 +57,9 @@ main = do
 
   LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sess++"_noise"
 
-  let realNoise =  take 10 sigs
+  let lns = Lines [LineWidth 1, LineType 1, LineColor "black"]  
+
+  let realNoise =  lns $ take 10 sigs
 
   --plotIt "autoCorr" $ map autoCorrSig $ sigs 
 
@@ -142,7 +144,7 @@ main = do
   --plotIt "obs" $ ("obs", zip [(0::Double)..] $ map  (@>2) vsamples)
   --plotIt "flat" $ ("flat", zip [(0::Double)..] $ map  (exp . (@>3)) vsamples)
 
-  puts $ "sigspan real = "++ show (runStat meanF $ map sigSpan realNoise) ++"\n\n"
+--  puts $ "sigspan real = "++ show (runStat meanF $ map sigSpan realNoise) ++"\n\n"
   --puts $ "sigspan model1 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr1) ++"\n\n"
   --puts $ "sigspan model2 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr2) ++"\n\n"
   puts $ "sigspan model3 = "++ show (runStat meanSDF $ map (runStat meanF . snd) fakeautocorr3) ++"\n\n"
@@ -174,16 +176,16 @@ main = do
   let midRow = triplot (ManySup $ fst3 scatters ) (ManySup $ snd3 scatters) (ManySup $ trd3 scatters)
   let botPlot = spanhists :||: mkAutoCorrPlot fakeautocorr3
 
-  plotIt "finalFigure1" $ (A realNoise :||: B fakesigs1) :==: (C fakesigs2 :||: D fakesigs3)
-  plotIt "finalFigure2" $ ((Ei $ YRange 0 500 $ XRange 1 7 $ ManySup $ fst3 scatters ) :||: 
-                           (Eii $ YRange 0 500 $ XRange 1 7 $ ManySup $ snd3 scatters)) :==: 
-                          ((Eiii $ YRange 0 500 $ ManySup $ trd3 scatters) :||: 
+  plotIt "fig2a" $ (A realNoise :||: B (lns fakesigs1)) :==: (C (lns fakesigs2) :||: D (lns fakesigs3))
+  plotIt "fig2b" $ ((Ei $ YRange 0 500 $ XRange 1 7 $ Points [PointType 7] $ ManySup $ fst3 scatters ) :||: 
+                           (Eii $ YRange 0 500 $ XRange 1 7 $ Points [PointType 7] $ ManySup $ snd3 scatters)) :==: 
+                          ((Eiii $ YRange 0 500 $ Points [PointType 7] $ ManySup $ trd3 scatters) :||: 
                           (Fi spanhists :==: Fii (mkAutoCorrPlot fakeautocorr3)))
 
   puts "\\end{document}"
   hClose h
 
-  system $ "pdflatex Figure2.tex"
+  --system $ "pdflatex Figure2.tex"
   return ()
 
 

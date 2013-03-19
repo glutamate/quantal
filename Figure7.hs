@@ -58,8 +58,8 @@ main = do
   hists <- forM (datasess ) $ \sess -> do
       (wf, wfAmp, _) <- getWf sess
       vsamples::[L.Vector Double] <- fmap (drop (getBurnIn "sess") . map L.fromList . catMaybes . map safeRead . lines) $ readFile (take 6 sess++"/npq_samples")
-      let ns =  HistoStyle "histeps" 50 $ map (roundD . (@>0)) vsamples
-          ps =  HistoStyle "histeps" 50 $ map ((@>2)) vsamples
+      let ns =  HistoStyle "histeps" 50 $ map ( (@>0)) vsamples
+          ps =  HistoStyle "histeps" 50 $ map (\v->1/(1+exp(-(v @> 2)))) vsamples
           qs =  HistoStyle "histeps" 50 $ map ((*wfAmp) . exp . (@>3)) vsamples
           nps = HistoStyle "histeps" 50 $ map (\v -> (v@>2) * (roundD $ (v@>0))) vsamples
       print sess
@@ -88,7 +88,7 @@ main = do
   plotIt "qhists" $ plotIxQ (-4) (-0.5)
   plotIt "nphists" $ plotIxNP 0 0.07 -}
 
-  plotIt "fig7" $ 34 % plotIxN 0 800 :|: 66% (plotIxP 0 1 :||: plotIxQ (1e-4) (0.1))
+  plotIt "fig7" $ 34 % plotIxN 20 60 :|: 66% (plotIxP 0 1 :||: plotIxQ (1e-4) (0.1))
 
 {-  plotIt "npqhists" $ Hplots [GnuplotBox $ plotIxN 0 800, 
                               GnuplotBox $ plotIxP 0 1, 
