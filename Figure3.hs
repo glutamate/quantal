@@ -3,7 +3,7 @@ module Main where
 
 import System.Environment
 import Database
-import Query hiding (io) 
+import Query hiding (io)
 import QueryTypes
 import QueryUtils hiding (averageSigs)
 import qualified QueryUtils as QU
@@ -40,7 +40,7 @@ import Control.Monad.Trans
 
 {-measTrad sess = do
   x<- doesFileExist (sess++"/tradAmps")
-  if x 
+  if x
      then fmap read $ readFile (sess++"/tradAmps")
      else measTrad1 sess -}
 
@@ -57,7 +57,7 @@ measTrad sess = do
      let noGood = contains ((>5)//swings) running
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
      let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
-     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
+     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
      let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
@@ -69,12 +69,12 @@ measTrad sess = do
 main = do
   --let sess = "57246a"
   let sess = "22b152"
-  h <- openFile ("Figure3.tex") WriteMode 
+  h <- openFile ("Figure3.tex") WriteMode
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPSOpts (nm++".eps") [SizeSpec "5.0,5.5"] $ obj
                          system $ "epstopdf "++nm++".eps"
                          puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
- 
+
   puts $ unlines     ["\\documentclass[11pt]{article}",
      "%include lhs2TeX.fmt",
      "%include polycode.fmt",
@@ -83,7 +83,7 @@ main = do
      "\\begin{document}",
      "\n"]
 
-  meass <- measTrad sess 
+  meass <- measTrad sess
 
   (wf, wfAmp, sigs) <- getWf $ take 6 sess
 
@@ -114,11 +114,11 @@ main = do
   let topQuad = (A $ YLabel "Estimated amplitude (mV)" $ ("Window", rngIt measPts)) :||: (B $ YTics [] $ ("Least squares", rngIt tsamps1))
         :==: ((C $ YLabel "Estimated amplitude (mV)" $ ("OU", rngIt tsamps2)) :||: (D $ YTics [] $ ("OU + obs", rngIt tsamps3)))
 
- 
---  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps 
+
+--  let failNewT = filter (\(t,v) -> v<0.5 && t > 700 && t < 800) tsamps
   --puts $ "failNew = "++show failNewT
 
---  let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts 
+--  let failOldT = filter (\(t,v) -> v<0.4 && t > 350 && t < 400) measPts
   --puts $ "failOld = "++show failOldT
 
 
@@ -130,7 +130,7 @@ main = do
 --  plotIt "failold" $ ("trad. fail", [failOldS]) :+: ("new fail", [failNewS])
 
 
-  
+
   --plotIt "wf" wf
   --plotIt "tst" GnuplotTest
 
@@ -142,7 +142,7 @@ main = do
   var12 <- forM (datasess) $ \sess1 -> do
      vars <- varDiff sess1
      --puts $ take 6 sess1++ "\t"++intercalate "\t" (map show vars)
-     return vars 
+     return vars
 
   let vars = map (runStat meanF) $ transpose $ filter allNonZero var12
 
@@ -165,10 +165,10 @@ main = do
   system $ "pdflatex Figure3.tex"
   return ()
 
-allNonZero = all (>1e-8) 
+allNonZero = all (>1e-8)
 
 varDiff sess = do
-  meass <- measTrad sess  
+  meass <- measTrad sess
 
   (wf, wfAmp, sigs) <- getWf sess
 

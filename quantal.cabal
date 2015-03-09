@@ -13,9 +13,72 @@ Executable quantal
    Main-Is:             Quantal.hs
    ghc-options:         -O2 -auto-all -rtsopts
 
-   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl, 
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
                         process, unix, binary, storablevector, storable-tuple,
-                        array, directory, baysig, spoon
+                        array, directory, baysig, spoon, tnutils
+
+Executable figure1
+   Main-Is:             Figure1.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+Executable figure2
+   Main-Is:             Figure2.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+Executable figure2all
+   Main-Is:             Figure2all.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+Executable figure3
+   Main-Is:             Figure3.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+
+Executable figure4
+   Main-Is:             Figure4.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+Executable figure5
+   Main-Is:             Figure5.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+
+Executable figure7
+   Main-Is:             Figure7.hs
+   ghc-options:         -O2 -auto-all -rtsopts
+
+   Build-depends:       base, bugpan, gnewplot, probably, hmatrix, mtl,
+                        process, unix, binary, storablevector, storable-tuple,
+                        array, directory, baysig, spoon, tnutils
+
+
+
+
+
+
 
 --Executable hsbibtex
 --   Main-Is:             hsbibtex.hs

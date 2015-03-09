@@ -1,26 +1,28 @@
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, NoMonomorphismRestriction, ViewPatterns, PackageImports #-}
+
 module MPFA where
 
-import Math.Probably.FoldingStats
+import "probably" Math.Probably.FoldingStats
 --import Math.Probably.Distribution
-import Math.Probably.GlobalRandoms
-import Math.Probably.Sampler
-import Math.Probably.StochFun
-import Math.Probably.MCMC
-import QueryPlots
-import QueryTypes
-import PlotGnuplot
-import TNUtils
-import Numeric.LinearAlgebra
-import qualified Math.Probably.PDF as PDF
+import "probably" Math.Probably.GlobalRandoms
+import "probably" Math.Probably.Sampler
+import "probably" Math.Probably.StochFun
+import "probably" Math.Probably.MCMC
+import "bugpan" QueryPlots
+import "bugpan" QueryTypes
+import "bugpan" PlotGnuplot
+import "tnutils" TNUtils
+import "hmatrix" Numeric.LinearAlgebra
+import qualified "probably" Math.Probably.PDF as PDF
 import Control.Monad
 import System.IO.Unsafe
 
 import Debug.Trace
 
 epsp :: Double -> Sampler Double
-epsp p = do 
+epsp p = do
   let n =100::Int
-      q = 10::Double          
+      q = 10::Double
       noise = 1::Double
   nr <- realToFrac `fmap` binomial n p
   gauss (nr*q) (sqrt $ q*nr*noise*noise)
@@ -28,7 +30,7 @@ epsp p = do
   --(q*) `fmap` gauss (n*p) (sqrt $ n*p*(1-p))
 
 --pdfAndSampler :: PDF.PDF Double -> Sampler Double -> GnuplotBox
-pdfAndSampler pdf sam = 
+pdfAndSampler pdf sam =
     let pts = sampleN 10000 sam
         (min, max) = runStat (both minF maxF) pts
     in FunSeg min max pdf :+: Histo 100 (pts)
@@ -42,13 +44,13 @@ mpfa :: Double ->   -- segment length
         [(Double,Double)] -> -- events with amplitudes
         [(Double,Double)] -- mean variance points
 
-mpfa t evs = 
+mpfa t evs =
   let maxt = maximum $ map fst evs
       segs = map (:[]) $ takeWhile (not . (>maxt) . fst . fst) $ tsegs t
       f seg = case during seg evs of
          [] -> []
          tamps -> [meanVarDetrended tamps]
-  in concatMap f segs 
+  in concatMap f segs
 
 meanVarDetrended :: [(Double, Double)] -> (Double, Double)
 meanVarDetrended pts = (mean, var) where
@@ -75,7 +77,7 @@ simps = [0.2,0.5,0.8]
 initps = map (const 0.5) simps
 
 timeC :: [Double]
-timeC =[0,1..1000] 
+timeC =[0,1..1000]
 
 initparsC, simparsC :: (Double, Double, Double,Double, Int,Double,Double)
 simparsC = (0.99, 0.01, 0.02, 500, 100, 10, 1)
@@ -92,21 +94,21 @@ epspsC :: [Double]
 epspsC = head $ unsafePerformIO $ runSamplerIO $ mapM epsp psC
 
 likeC :: PDF.PDF (Double, Double, Double,Double, Int,Double,Double )
-likeC pars = 
+likeC pars =
     sum $ map (like1C pars)  $ zip timeC epspsC
 
 like1C :: (Double, Double, Double,Double, Int,Double,Double ) -> PDF.PDF (Double, Double)
-like1C pars@(phi, plo, slop, offset, n, q, noise) (t,v) = 
+like1C pars@(phi, plo, slop, offset, n, q, noise) (t,v) =
     let p = calcp pars t
-        nrs = [1..n]      
-    in log $ sum $ for nrs $ \nr ->  
-        let nrdbl = realToFrac nr 
+        nrs = [1..n]
+    in log $ sum $ for nrs $ \nr ->
+        let nrdbl = realToFrac nr
         in PDF.gaussD (nrdbl*q) (sqrt $ q*nrdbl*noise*noise) (v) *
            PDF.binomial n p nr -- (PDF.logBinomial (round $ n) p (round $ v/q))
 
 --for = flip map
 
-proposalC :: (Double, Double, Double,Double, Int,Double,Double ) -> 
+proposalC :: (Double, Double, Double,Double, Int,Double,Double ) ->
              Sampler (Double, Double, Double,Double, Int,Double,Double )
 proposalC (phi, plo, slop, offset, n, q, noise) = do
   nphi <- psam' phi
@@ -128,22 +130,22 @@ dvars = map (runStat varF) dat
 dmeans = map (runStat meanF) dat
 
 likeMPFA :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
-likeMPFA bgSd meanvars v = 
+likeMPFA bgSd meanvars v =
     let n = v@>0
         q = exp $ v@> 1
         varvar = exp $ v@>2
         imax = (foldl1 max $ map fst meanvars) * (1+ exp(v@>3))
 --        dist1 (x1,y1) (x2,y2) = sqrt $ (x2-x1)^^2 + (y2-y1)^^2
 --        dist = sum $ map (uncurry dist1) $ zip meanvars (zip predmean predvar)
-        
-    in sum $ flip map (meanvars ) 
+
+    in sum $ flip map (meanvars )
            $ \(mean, var) -> let p = mean/imax
                                  predvar = n*p*(1-p)*q*q*(1+0.15*0.15)+bgSd*bgSd
                              in  PDF.gaussD (predvar) (varvar) var
                                  +PDF.gaussD (n*p*q) (sqrt (predvar)) mean
 
 likeMPFA1 :: Double -> [(Double, Double)]-> PDF.PDF (Vector Double)
-likeMPFA1 bgSd meanvars v = 
+likeMPFA1 bgSd meanvars v =
     let n = v@>0
         q = v@> 1
         fitNoiseMean = v@>2
@@ -153,16 +155,16 @@ likeMPFA1 bgSd meanvars v =
         predvar = map (\p -> n*p*(1-p)*q*q) ps
 --        dist1 (x1,y1) (x2,y2) = sqrt $ (x2-x1)^^2 + (y2-y1)^^2
 --        dist = sum $ map (uncurry dist1) $ zip meanvars (zip predmean predvar)
-        
-    in sum $ flip map (zip meanvars ps) 
+
+    in sum $ flip map (zip meanvars ps)
            $ \((mean, var), p) -> PDF.gaussD (n*p*q) (fitNoiseMean) mean
                                 + PDF.gaussD (n*p*(1-p)*q*q) (fitNoiseVar) var
 
 
 --map (\x-> x*x) $ map (\(mu,var)-> fitfun (n,q) mu - var) $ meanvars
 
-fitfun (n, q) npq = npq*(1-npq/(n*q))*q 
-    
+fitfun (n, q) npq = npq*(1-npq/(n*q))*q
+
 pmeans (n,ps,q) =  map (*(n*q)) ps
 pvars (n,ps,q) = map (\p -> n*p*(1-p)*q*q) ps
 
@@ -177,14 +179,14 @@ proposal (n,ps,q) = do
 
 maxLike :: (a -> Double) -> (a -> Sampler a) -> a -> Markov (a, Double)
 maxLike like prop init = Mrkv (condSampler sf) init' id
-    where sf (x,likeval) = do 
+    where sf (x,likeval) = do
             newx <- prop x
             let newlike = like newx
             return $ if likeval > newlike || nanOrInf newlike
                         then (x,likeval)
                         else (newx, newlike)
           init' = (init, like init)
-    
+
 ml = head $ drop 100 $ unsafePerformIO $ runMarkovIO $ maxLike likeData proposal initvs
 ml1 = head $ drop 100 $ unsafePerformIO $ runMarkovIO $ maxLike likeData proposal simvs
 --ml2 = head $ drop 50 $ unsafePerformIO $ runMarkovIO $ maxLike likeMPFA proposal initvs
@@ -210,14 +212,14 @@ psam :: Double -> Sampler Double
 psam p = do
   beta (round alpha) (newbeta p)
 
-proposalPDF (n,ps, q) (nn,nps,nq) 
+proposalPDF (n,ps, q) (nn,nps,nq)
     = PDF.gaussD n 1 nn +
       PDF.gaussD q 0.1 nq +
       sum (map (\(p, np) -> (PDF.beta 20 (newbeta' p) np)) (zip ps nps) )
 
 
 {-beta :: Int -> Int -> Sampler Double
-beta a b = 
+beta a b =
     let gam n = do us <- forM [1..n] $ const unitSample
                    return $ log $ product us
     in do gama1 <- gam a
@@ -235,6 +237,6 @@ ifProb3 :: Double -> a -> a -> a-> Sampler a
 ifProb3 p c a1 a2 = do
   u <- unitSample
   case u of
-    _ | u < p -> return a1 
-    _ | u > (1-p) -> return a2 
-    _ | otherwise -> return c 
+    _ | u < p -> return a1
+    _ | u > (1-p) -> return a2
+    _ | otherwise -> return c

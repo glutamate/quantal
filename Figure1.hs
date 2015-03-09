@@ -2,11 +2,11 @@
 module Main where
 
 import System.Environment
-import Database
-import Query hiding (io) 
-import QueryTypes
-import QueryUtils hiding (averageSigs)
-import qualified QueryUtils as QU
+import "bugpan" Database
+import "bugpan" Query hiding (io)
+import "bugpan" QueryTypes
+import "bugpan" QueryUtils hiding (averageSigs)
+import qualified "bugpan" QueryUtils as QU
 import Data.Maybe
 import Data.List
 import Control.Monad
@@ -15,7 +15,7 @@ import "probably" Math.Probably.RandIO
 import QuantalHelp
 import "baysig" Baysig.Estimate.RTS
 import Data.Binary
-import qualified Numeric.LinearAlgebra as L
+import qualified "hmatrix" Numeric.LinearAlgebra as L
 import "probably" Math.Probably.MCMC
 import "probably" Math.Probably.Sampler
 import "probably" Math.Probably.FoldingStats
@@ -26,25 +26,25 @@ import Data.Ord
 import System.Posix.Directory
 import System.Cmd
 
-import Graphics.Gnewplot.Exec
-import Graphics.Gnewplot.Types
-import Graphics.Gnewplot.Style
-import Graphics.Gnewplot.Panels
-import Graphics.Gnewplot.Instances
-import Graphics.Gnewplot.Histogram
+import "gnewplot" Graphics.Gnewplot.Exec
+import "gnewplot" Graphics.Gnewplot.Types
+import "gnewplot" Graphics.Gnewplot.Style
+import "gnewplot" Graphics.Gnewplot.Panels
+import "gnewplot" Graphics.Gnewplot.Instances
+import "gnewplot" Graphics.Gnewplot.Histogram
 
-import Control.Monad.Trans
+--import "transformers" Control.Monad.Trans
 
 import MPFA
 
 main = do
   let sess = "57246a"
-  h <- openFile ("Figure1.tex") WriteMode 
+  h <- openFile ("Figure1.tex") WriteMode
   let puts s = hPutStrLn  h $ s ++ "\n"
       plotIt nm obj = do gnuplotToPS (nm++".eps") $ obj
                          system $ "epstopdf "++nm++".eps"
                          puts $"\\includegraphics[width=16cm]{"++nm++"}\n\n"
- 
+
   puts $ unlines     ["\\documentclass[11pt]{article}",
      "%include lhs2TeX.fmt",
      "%include polycode.fmt",
@@ -65,7 +65,7 @@ main = do
      let noGood = contains ((>5)//swings) running
      let spikeg = sortBy ( comparing (fst)) $ minInterval 0.1 $ notDuring exclude $ notDuring noGood spike
      let noiseSigs = take 50 $ limitSigs' (-0.11) (-0.01) $ around (spikeg) $ vm
-     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm 
+     let epspSigs = during (durAroundEvent (0.03) 0.07 spikeg) vm
      let aroundSpike = baseline (-0.003) 0.003 $ limitSigs' (-0.05) 0.05 $ around (spikeg) $ vm
      let ampPeak = snd $ head $ peak $ take 1 $ QU.averageSigs $ take 100 $ aroundSpike
      let tpeak = fst $ head $ peak $ take 1 $ QU.averageSigs $ aroundSpike
@@ -75,15 +75,15 @@ main = do
      return $ Just measDur
 
   nms <- fmap read $  readFile (take 6 sess++"/sessions")
-  sigs <- fmap concat $ forM nms $ \sessNm-> do 
-            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps" 
+  sigs <- fmap concat $ forM nms $ \sessNm-> do
+            LoadSignals sigs <- decodeFile $ take 6 sess++"/sigs_"++take 6 sessNm++"_epsps"
             return sigs
   let wf@(Signal _ _ sv) =  averageSigs $ sigs
   let wfAmp = foldl1' max $ L.toList sv
   puts $ "Figure 1\n\n"
 
-  let plotA = AxisLabels "time (s)" "membrane voltage (mV)" $ 
-                  (Lines [LineWidth 1, LineType 1, LineColor "red"] $ sigsAlignZero $ take 10 $ drop 250 sigs) :+: 
+  let plotA = AxisLabels "time (s)" "membrane voltage (mV)" $
+                  (Lines [LineWidth 1, LineType 1, LineColor "red"] $ sigsAlignZero $ take 10 $ drop 250 sigs) :+:
                   (Lines [LineWidth 4, LineType 1, LineColor "black"] $ sigAlignZero $ smap (\v -> v-2.5) wf)
 
 
@@ -106,7 +106,7 @@ main = do
 
 --  plotIt ("epsps_"++ take 6 sess) $ measPts
 
-  
+
 
   puts "\\end{document}"
   hClose h
